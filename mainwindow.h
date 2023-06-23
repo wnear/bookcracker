@@ -1,0 +1,35 @@
+
+#include <QMainWindow>
+
+class Mainwindow : public QMainWindow {
+  public:
+    enum WordType { KNEW, DICT, IGNORED, NEW };
+    Mainwindow();
+    ~Mainwindow();
+
+    void setupBtns();
+
+    void openFile(const QString &filename);
+
+  private:
+    void loadPage(int n);
+
+    void go_next();
+    void go_previous();
+    void scale_bigger();
+    void scale_smaller();
+
+    bool shouldShowWordType(WordType wt) const;
+
+    QStringList do_filter(const QStringList &cur);
+    QStringList words_forCurPage();
+    QStringList words_forDocument();
+    // QStringList scavenge_impl(){}
+    void update_filter();
+
+    void go_to(int n);
+
+  private:
+    class Private;
+    Private *d;
+};

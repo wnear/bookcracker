@@ -26,5 +26,5 @@ INCLUDEPATH += /usr/include/poppler/qt6
 #DEFINES += QT_DISABLE_DEPRECATED_UP_TO=0x060000 # disables all APIs deprecated in Qt 6.0.0 and earlier
 
 # Input
-HEADERS += mainwindow.h widget.h words.h
-SOURCES += main.cc mainwindow.cc widget.cc words.cc
+HEADERS += mainwindow.h widget.h words.h utils.h
+SOURCES += main.cc mainwindow.cc widget.cc words.cc utils.cc

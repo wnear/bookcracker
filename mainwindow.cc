@@ -6,6 +6,7 @@
 #include <format>
 
 #include <poppler/qt6/poppler-qt6.h>
+#include <poppler/qt6/poppler-annotation.h>
 #include <QTextEdit>
 #include <QListWidget>
 #include <QListView>
@@ -54,6 +55,9 @@ std::optional<QString> getWord(QString &carried, QString cur) {
 }  // namespace
 class Mainwindow::Private {
   public:
+    // settings
+    double scale = 1.0;
+
     // gui
     QTextEdit *x{nullptr};
     QLabel *label{nullptr};
@@ -62,6 +66,7 @@ class Mainwindow::Private {
     QStringListModel *model{nullptr};
     QCheckBox *btn_showdict{nullptr};
     QCheckBox *btn_showcapitalword{nullptr};
+    QPushButton *btn_about;
 
     QPushButton *btn_scanscope;
 
@@ -77,8 +82,9 @@ class Mainwindow::Private {
     QSet<QString> words_knew;
     QSet<QString> words_ignore;
 
-    QStringList words_all;               // all words in current page.
-    QStringList words_afterFilter;       // after filter.
+    QStringList words_page_all;               // all words in current page.
+    QStringList words_page_afterFilter;       // after filter.
+    set<QString> words_page_afterFilter_set;
     QStringList words_docu_all;          // all words in current page.
     QStringList words_docu_afterFilter;  // after filter.
     //
@@ -216,9 +222,14 @@ void Mainwindow::openFile(const QString &filename) {
         cout << "load file fail, file not exist" << endl;
         return;
     }
+
     d->document = Poppler::Document::load(filename);
+    d->document->setRenderHint(Poppler::Document::Antialiasing);
+    d->document->setRenderHint(Poppler::Document::TextAntialiasing);
     d->pagewidth = d->label->width();
+    // this function will only run once, update later.
     d->words_docu_all = words_forDocument();
+    test_scan_annotations();
     this->go_to(0);
 }
 Mainwindow::~Mainwindow() {
@@ -235,7 +246,7 @@ void Mainwindow::go_to(int n) {
         pageno = page_max - 1;
     }
     d->pageno = pageno;
-    this->loadPage(d->pageno);
+    this->load_page(d->pageno);
 }
 
 void Mainwindow::go_previous() {
@@ -248,41 +259,42 @@ void Mainwindow::go_next() {
     this->go_to(d->pageno + 1);
 }
 
-void Mainwindow::loadPage(int n) {
+void Mainwindow::load_page(int n) {
     d->pageno = n;
     d->pdfpage = d->document->page(d->pageno);
     cout << "load page:" << n << endl;
-    // int xres = 100;
-    // int yres = 100;
-    // int x = 0;
-    // int y = 0;
-    // int width = 100;
-    // int height = 100;
-    int width = d->pagewidth;
-    if (d->pagewidth == -1) {
-        width = d->label->width() * 2;
-    }
-    width = d->label->width() * 2;
 
-    // FIXME: compile fail. even with `CONFIG += C++20`
-    // cout << std::format("renderToImage parameters: width:{}", width)<<endl;
+    d->words_page_all = words_forCurPage();
+    update_filter();
+    // d->words_page_afterFilter = do_filter(d->words_page_all);
 
-    qDebug() << QString("renderToImage parameters: width:%1").arg(width);
-    auto image = d->pdfpage->renderToImage(120, 120, 0, 0, -1, d->label->height());
-    d->label->setPixmap(QPixmap::fromImage(image));
-
-    d->words_all = words_forCurPage();
-    d->words_afterFilter = do_filter(d->words_all);
-
-    d->model->setStringList(d->words_afterFilter);
+    d->model->setStringList(d->words_page_afterFilter);
 
     // highlight word.
-    for (auto &w : d->words_afterFilter) {
+    auto myann = new Poppler::HighlightAnnotation;
+    myann->setHighlightType(Poppler::HighlightAnnotation::Highlight);
+
+    // myann->setBoundary(region);
+    //
+    const QList<Poppler::HighlightAnnotation::Quad> quads = {
+        {{{0, 0.1}, {0.2, 0.3}, {0.4, 0.5}, {0.6, 0.7}}, false, false, 0},
+        // {{{0.8, 0.9}, {0.1, 0.2}, {0.3, 0.4}, {0.5, 0.6}}, true, false, 0.4}
+    };
+    myann->setHighlightQuads(quads);
+    Poppler::Annotation::Style styl;
+    styl.setColor(Qt::red);
+    styl.setOpacity(0.5);
+    myann->setStyle(styl);
+
+    d->pdfpage->addAnnotation(myann);
+    // d->pdfpage->removeAnnotation();
+    for (auto &w : d->words_page_afterFilter) {
         auto tx = d->pdfpage->textList();
         QString carried;
         for (auto i = tx.begin(); i < tx.end(); i++) {
             auto cur = i->get()->text().simplified();
-            i->get()->boundingBox();
+            auto rect = i->get()->boundingBox();
+
             if (auto res = getWord(carried, cur); res == nullopt) {
                 continue;
             } else {
@@ -298,25 +310,29 @@ void Mainwindow::loadPage(int n) {
             }
         }
     }
+    update_image();
 }
 
 void Mainwindow::setupBtns() {}
 void Mainwindow::scale_bigger() {
-    if (d->pagewidth == -1) {
-        d->pagewidth = d->label->width();
+    if (d->scale >= 5.0) {
+        return;
     }
-    if (d->pagewidth > 50) d->pagewidth -= 10;
+    d->scale += 0.2;
+    update_image();
 }
 
 void Mainwindow::scale_smaller() {
-    if (d->pagewidth == -1) {
-        d->pagewidth = d->label->width();
+    if (d->scale <= 0.1) {
+        return;
     }
-    if (d->pagewidth < 5460) d->pagewidth += 10;
+    d->scale -= 0.1;
+    update_image();
 }
 
 QStringList Mainwindow::do_filter(const QStringList &cur) {
     QStringList res;
+
     for (auto i : cur) {
         // if (d->words_knew.contains(i) || d->words_ignore.contains(i)) continue;
         if (d->wordstore->isKnown(i) && !this->shouldShowWordType(KNEW)) continue;
@@ -334,10 +350,11 @@ QStringList Mainwindow::do_filter(const QStringList &cur) {
 
 void Mainwindow::update_filter() {
     if (d->scopeIsPage) {
-        cout << __func__ << "before, size:" << d->words_afterFilter.size() << endl;
-        d->words_afterFilter = do_filter(d->words_all);
-        cout << __func__ << "after, size:" << d->words_afterFilter.size() << endl;
-        d->model->setStringList(d->words_afterFilter);
+        cout << __func__ << "before, size:" << d->words_page_afterFilter.size() << endl;
+        d->words_page_afterFilter = do_filter(d->words_page_all);
+
+        cout << __func__ << "after, size:" << d->words_page_afterFilter.size() << endl;
+        d->model->setStringList(d->words_page_afterFilter);
     } else {
         cout << __func__ << "before, size:" << d->words_docu_afterFilter.size() << endl;
         d->words_docu_afterFilter = do_filter(d->words_docu_all);
@@ -436,9 +453,10 @@ QStringList Mainwindow::words_forDocument() {
     std::sort(res.begin(), res.end(),
               [&](auto &&a, auto &&b) { return words_cntr[a] > words_cntr[b]; });
     // test:
-    for (auto w : res) {
-        cout << words_cntr[w] << ": " << w.toStdString() << endl;
-    }
+    // for (auto w : res) {
+    //     cout << words_cntr[w] << ": " << w.toStdString() << endl;
+    // }
+
     return res;
 }
 
@@ -462,3 +480,36 @@ bool Mainwindow::shouldShowWordType(WordType wt) const {
     }
     return false;
 }
+void Mainwindow::update_image() {
+    int width = d->pagewidth;
+    if (d->pagewidth == -1) {
+        width = d->label->width() * 2;
+    }
+    width = d->label->width() * 2;
+
+    // FIXME: compile fail. even with `CONFIG += C++20`
+    // cout << std::format("renderToImage parameters: width:{}", width)<<endl;
+
+    // qDebug() << QString("renderToImage parameters: width:%1").arg(width);
+    // qDebug() << "x :" << this->physicalDpiX();
+    // qDebug() << "y :" << this->physicalDpiY();
+    // auto [xres, yres] = make_pair(this->physicalDpiY() * d->scale, this->physicalDpiY() * d->scale);
+    auto [xres, yres] = make_pair(72, 72);
+
+    auto image = d->pdfpage->renderToImage(
+        xres,
+        yres, 0,  0,
+        d->pdfpage->pageSize().width() * d->scale ,
+        d->pdfpage->pageSize().height()*d->scale );
+    d->label->setPixmap(QPixmap::fromImage(image));
+}
+void Mainwindow::test_scan_annotations() {
+    for(int i = 0; i< d->document->numPages(); i++){
+        auto page = d->document->page(i);
+        auto annos = page->annotations();
+        if(annos.size()){
+            qDebug()<<QString("page %1 has %2 annotations.").arg(i).arg(annos.size());
+        }
+    }
+}
+

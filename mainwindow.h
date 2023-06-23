@@ -12,12 +12,14 @@ class Mainwindow : public QMainWindow {
     void openFile(const QString &filename);
 
   private:
-    void loadPage(int n);
+    void load_page(int n);
 
     void go_next();
     void go_previous();
     void scale_bigger();
     void scale_smaller();
+    void update_image();
+    void test_scan_annotations();
 
     bool shouldShowWordType(WordType wt) const;
 

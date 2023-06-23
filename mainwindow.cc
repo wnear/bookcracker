@@ -5,8 +5,8 @@
 #include <algorithm>
 #include <format>
 
-#include <poppler/qt6/poppler-qt6.h>
-#include <poppler/qt6/poppler-annotation.h>
+#include <poppler/qt5/poppler-qt5.h>
+#include <poppler/qt5/poppler-annotation.h>
 #include <QTextEdit>
 #include <QListWidget>
 #include <QListView>
@@ -25,14 +25,16 @@
 #include <QToolButton>
 #include <QMenu>
 
+#include <QDebug>
+
 using namespace std;
 
 namespace {
-std::optional<QString> getWord(QString &carried, QString cur) {
+QString getWord(QString &carried, QString cur) {
     if (cur.endsWith("-")) {
         cur.chop(1);
         carried += cur;
-        return nullopt;
+        return "";
     }
     if (!carried.isEmpty()) {
         cur = carried + cur;
@@ -48,7 +50,7 @@ std::optional<QString> getWord(QString &carried, QString cur) {
         if (c == '\'') break;
     }
     if (cur_word.empty()) {
-        return nullopt;
+        return "";
     }
     return QString::fromStdString(cur_word);
 }
@@ -65,7 +67,8 @@ class Mainwindow::Private {
     QListView *listview{nullptr};
     QStringListModel *model{nullptr};
     QCheckBox *btn_showdict{nullptr};
-    QCheckBox *btn_showcapitalword{nullptr};
+    QCheckBox *btn_showConciseWordOnly{nullptr};
+    QCheckBox *btn_showConciseOnly{nullptr};
     QPushButton *btn_about;
 
     QPushButton *btn_scanscope;
@@ -74,16 +77,22 @@ class Mainwindow::Private {
     QString filename;
     int pageno{0};
     int pagewidth = -1;
+
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
     std::unique_ptr<Poppler::Page> pdfpage{nullptr};
     std::unique_ptr<Poppler::Document> document{nullptr};
+#else
+    Poppler::Page *pdfpage{nullptr};
+    Poppler::Document *document{nullptr};
+#endif
 
     std::unique_ptr<TextSave> wordstore{nullptr};
     // data, should be consistent.
     QSet<QString> words_knew;
     QSet<QString> words_ignore;
 
-    QStringList words_page_all;               // all words in current page.
-    QStringList words_page_afterFilter;       // after filter.
+    QStringList words_page_all;          // all words in current page.
+    QStringList words_page_afterFilter;  // after filter.
     set<QString> words_page_afterFilter_set;
     QStringList words_docu_all;          // all words in current page.
     QStringList words_docu_afterFilter;  // after filter.
@@ -188,12 +197,12 @@ Mainwindow::Mainwindow() {
         }
 
         if (1) {
-            d->btn_showcapitalword = new QCheckBox("Show word with captical word");
-            d->btn_showcapitalword->setChecked(true);
-            lay->addWidget(d->btn_showcapitalword);
+            d->btn_showConciseWordOnly = new QCheckBox("Show concise word only");
+            // d->btn_showConciseWordOnly->setChecked();
+            lay->addWidget(d->btn_showConciseWordOnly);
             // connect(d->btn_showcapitalword, &QPushButton::clicked,
             // d->btn_showcapitalword, &QPushButton::toggle);
-            connect(d->btn_showcapitalword, &QAbstractButton::clicked, this,
+            connect(d->btn_showConciseWordOnly, &QAbstractButton::clicked, this,
                     &Mainwindow::update_filter);
         }
 
@@ -205,6 +214,15 @@ Mainwindow::Mainwindow() {
                 this->d->scopeIsPage = !this->d->scopeIsPage;
                 update_filter();
             });
+        }
+        if (0) {
+            d->btn_showConciseOnly = new QCheckBox("Show word with captical word");
+            d->btn_showConciseOnly->setChecked(true);
+            lay->addWidget(d->btn_showConciseOnly);
+            // connect(d->btn_showConciseOnly, &QPushButton::clicked,
+            // d->btn_showConciseOnly, &QPushButton::toggle);
+            connect(d->btn_showConciseOnly, &QAbstractButton::clicked, this,
+                    &Mainwindow::update_filter);
         }
         lay->addWidget(d->listview);
     }
@@ -224,6 +242,9 @@ void Mainwindow::openFile(const QString &filename) {
     }
 
     d->document = Poppler::Document::load(filename);
+    // cout <<"backend: "<< d->document->availableRenderBackends().size()<<endl;
+    // cout << "backend: now"<< d->document->renderBackend() << endl;
+    d->document->setRenderBackend(Poppler::Document::QPainterBackend);
     d->document->setRenderHint(Poppler::Document::Antialiasing);
     d->document->setRenderHint(Poppler::Document::TextAntialiasing);
     d->pagewidth = d->label->width();
@@ -259,6 +280,7 @@ void Mainwindow::go_next() {
     this->go_to(d->pageno + 1);
 }
 
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 void Mainwindow::load_page(int n) {
     d->pageno = n;
     d->pdfpage = d->document->page(d->pageno);
@@ -286,32 +308,107 @@ void Mainwindow::load_page(int n) {
     styl.setOpacity(0.5);
     myann->setStyle(styl);
 
-    d->pdfpage->addAnnotation(myann);
+    // d->pdfpage->addAnnotation(myann);
+    double width = d->pdfpage->pageSizeF().width();
+    double height = d->pdfpage->pageSizeF().height();
     // d->pdfpage->removeAnnotation();
-    for (auto &w : d->words_page_afterFilter) {
-        auto tx = d->pdfpage->textList();
-        QString carried;
-        for (auto i = tx.begin(); i < tx.end(); i++) {
-            auto cur = i->get()->text().simplified();
-            auto rect = i->get()->boundingBox();
+    if (0) {
+        for (auto &w : d->words_page_afterFilter) {
+            auto tx = d->pdfpage->textList();
+            QString carried;
+            for (auto i = tx.begin(); i < tx.end(); i++) {
+                auto cur = i->get()->text().simplified();
+                auto rect = i->get()->boundingBox();
 
-            if (auto res = getWord(carried, cur); res == nullopt) {
-                continue;
-            } else {
-                cur = res.value();
-                if (cur == w) {
-                    auto region = i->get()->boundingBox();
+                qDebug() << QString("rect: (%1, %2, %3, %4)")
+                                .arg(rect.top() / height)
+                                .arg(rect.left() / width)
+                                .arg(rect.right() / width)
+                                .arg(rect.bottom() / height);
 
-                    auto myann = new Poppler::HighlightAnnotation;
-                    myann->setHighlightType(Poppler::HighlightAnnotation::Underline);
-                    myann->setBoundary(region);
-                    d->pdfpage->addAnnotation(myann);
+                if (auto res = getWord(carried, cur); res.isEmpty()) {
+                    continue;
+                } else {
+                    cur = res;
+                    if (cur == w) {
+                        auto region = i->get()->boundingBox();
+
+                        auto myann = new Poppler::HighlightAnnotation;
+                        myann->setHighlightType(Poppler::HighlightAnnotation::Underline);
+                        myann->setBoundary(region);
+                        d->pdfpage->addAnnotation(myann);
+                    }
                 }
             }
         }
     }
     update_image();
 }
+#else
+void Mainwindow::load_page(int n) {
+    d->pageno = n;
+    d->pdfpage = d->document->page(d->pageno);
+    cout << "load page:" << n << endl;
+
+    d->words_page_all = words_forCurPage();
+    update_filter();
+    // d->words_page_afterFilter = do_filter(d->words_page_all);
+
+    d->model->setStringList(d->words_page_afterFilter);
+
+    // highlight word.
+    auto myann = new Poppler::HighlightAnnotation;
+    myann->setHighlightType(Poppler::HighlightAnnotation::Highlight);
+
+    // myann->setBoundary(region);
+    //
+    const QList<Poppler::HighlightAnnotation::Quad> quads = {
+        {{{0, 0.1}, {0.2, 0.3}, {0.4, 0.5}, {0.6, 0.7}}, false, false, 0},
+        // {{{0.8, 0.9}, {0.1, 0.2}, {0.3, 0.4}, {0.5, 0.6}}, true, false, 0.4}
+    };
+    myann->setHighlightQuads(quads);
+    Poppler::Annotation::Style styl;
+    styl.setColor(Qt::red);
+    styl.setOpacity(0.5);
+    myann->setStyle(styl);
+
+    // d->pdfpage->addAnnotation(myann);
+    double width = d->pdfpage->pageSizeF().width();
+    double height = d->pdfpage->pageSizeF().height();
+    // d->pdfpage->removeAnnotation();
+    if (0) {
+        for (auto &w : d->words_page_afterFilter) {
+            auto tx = d->pdfpage->textList();
+            QString carried;
+            for (auto i = tx.begin(); i < tx.end(); i++) {
+                auto cur = (*i)->text().simplified();
+                auto rect = (*i)->boundingBox();
+
+                qDebug() << QString("rect: (%1, %2, %3, %4)")
+                                .arg(rect.top() / height)
+                                .arg(rect.left() / width)
+                                .arg(rect.right() / width)
+                                .arg(rect.bottom() / height);
+
+                if (auto res = getWord(carried, cur); res.isEmpty()) {
+                    continue;
+                } else {
+                    cur = res;
+                    if (cur == w) {
+                        auto region = (*i)->boundingBox();
+
+                        auto myann = new Poppler::HighlightAnnotation;
+                        myann->setHighlightType(Poppler::HighlightAnnotation::Underline);
+                        myann->setBoundary(region);
+                        d->pdfpage->addAnnotation(myann);
+                    }
+                }
+            }
+        }
+    }
+    update_image();
+}
+#endif
 
 void Mainwindow::setupBtns() {}
 void Mainwindow::scale_bigger() {
@@ -330,22 +427,27 @@ void Mainwindow::scale_smaller() {
     update_image();
 }
 
-QStringList Mainwindow::do_filter(const QStringList &cur) {
-    QStringList res;
+QStringList Mainwindow::do_filter(const QStringList &wordlist) {
+    QStringList filtered_wordlist;
 
-    for (auto i : cur) {
+    for (auto word : wordlist) {
         // if (d->words_knew.contains(i) || d->words_ignore.contains(i)) continue;
-        if (d->wordstore->isKnown(i) && !this->shouldShowWordType(KNEW)) continue;
-        if (d->wordstore->isIgnored(i) && !this->shouldShowWordType(IGNORED)) continue;
-        if (d->wordstore->isInDict(i) && !this->shouldShowWordType(DICT)) continue;
-        if (d->btn_showcapitalword and i[0].isUpper() and
-            !d->btn_showcapitalword->isChecked()) {
-            continue;
+        if (d->wordstore->isKnown(word) && !this->shouldShowWordType(KNEW)) continue;
+        if (d->wordstore->isIgnored(word) && !this->shouldShowWordType(IGNORED)) continue;
+        if (d->wordstore->isInDict(word) && !this->shouldShowWordType(DICT)) continue;
+        if (d->btn_showConciseWordOnly and d->btn_showConciseWordOnly->isChecked()) {
+            QStringList suffiexes = {"er", "ing", "ed", "s",  "ful",
+                                     "ly", "est", "en", "ish"};
+            auto it = std::find_if(suffiexes.begin(), suffiexes.end(),
+                                   [word](auto &&sf) { return word.endsWith(sf); });
+            if (it != suffiexes.end() or word[0].isUpper()) {
+                continue;
+            }
         }
 
-        res.push_back(i);
+        filtered_wordlist.push_back(word);
     }
-    return res;
+    return filtered_wordlist;
 }
 
 void Mainwindow::update_filter() {
@@ -372,12 +474,12 @@ QStringList Mainwindow::words_forCurPage() {
     QSet<QString> words_cache;
     QString carried;
     for (auto i = tx.begin(); i < tx.end(); i++) {
-        auto cur = i->get()->text().simplified();
-        i->get()->boundingBox();
-        if (auto res = getWord(carried, cur); res == nullopt) {
+        auto cur = (*i)->text().simplified();
+        (*i)->boundingBox();
+        if (auto res = getWord(carried, cur); res.isEmpty()) {
             continue;
         } else {
-            cur = res.value();
+            cur = res;
         }
 
         bool contains = true;
@@ -431,10 +533,10 @@ QStringList Mainwindow::words_forDocument() {
         auto tx = page->textList();
         for (auto i = tx.begin(); i < tx.end(); i++) {
             auto cur = i->get()->text().simplified();
-            if (auto res = getWord(carried, cur); res == nullopt) {
+            if (auto res = getWord(carried, cur); res.isEmpty()) {
                 continue;
             } else {
-                cur = res.value();
+                cur = res;
             }
 
             bool contains = words_cache.contains(cur);
@@ -493,23 +595,21 @@ void Mainwindow::update_image() {
     // qDebug() << QString("renderToImage parameters: width:%1").arg(width);
     // qDebug() << "x :" << this->physicalDpiX();
     // qDebug() << "y :" << this->physicalDpiY();
-    // auto [xres, yres] = make_pair(this->physicalDpiY() * d->scale, this->physicalDpiY() * d->scale);
+    // auto [xres, yres] = make_pair(this->physicalDpiY() * d->scale, this->physicalDpiY()
+    // * d->scale);
     auto [xres, yres] = make_pair(72, 72);
 
-    auto image = d->pdfpage->renderToImage(
-        xres,
-        yres, 0,  0,
-        d->pdfpage->pageSize().width() * d->scale ,
-        d->pdfpage->pageSize().height()*d->scale );
+    auto image = d->pdfpage->renderToImage(xres, yres, 0, 0,
+                                           d->pdfpage->pageSize().width() * d->scale,
+                                           d->pdfpage->pageSize().height() * d->scale);
     d->label->setPixmap(QPixmap::fromImage(image));
 }
 void Mainwindow::test_scan_annotations() {
-    for(int i = 0; i< d->document->numPages(); i++){
+    for (int i = 0; i < d->document->numPages(); i++) {
         auto page = d->document->page(i);
         auto annos = page->annotations();
-        if(annos.size()){
-            qDebug()<<QString("page %1 has %2 annotations.").arg(i).arg(annos.size());
+        if (annos.size()) {
+            qDebug() << QString("page %1 has %2 annotations.").arg(i).arg(annos.size());
         }
     }
 }
-

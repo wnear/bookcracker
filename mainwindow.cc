@@ -16,6 +16,8 @@
 #include <QFileInfo>
 #include <QPushButton>
 
+#include <QTransform>
+
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QSplitter>
@@ -71,8 +73,11 @@ class Mainwindow::Private {
     QCheckBox *btn_showConciseWordOnly{nullptr};
     QCheckBox *btn_showConciseOnly{nullptr};
     QPushButton *btn_about;
-
     QPushButton *btn_scanscope;
+
+    // pdf dispay helper
+    QTransform normalizedTransform;
+    QSizeF pageViewSize;
 
     // pdf
     QString filename;
@@ -248,8 +253,8 @@ void Mainwindow::openFile(const QString &filename) {
     // cout <<"backend: "<< d->document->availableRenderBackends().size()<<endl;
     // cout << "backend: now"<< d->document->renderBackend() << endl;
     // d->document->setRenderBackend(Poppler::Document::QPainterBackend);
-    d->document->setRenderHint(Poppler::Document::Antialiasing);
-    d->document->setRenderHint(Poppler::Document::TextAntialiasing);
+    // d->document->setRenderHint(Poppler::Document::Antialiasing);
+    // d->document->setRenderHint(Poppler::Document::TextAntialiasing);
     d->pagewidth = d->label->width();
     // this function will only run once, update later.
     d->words_docu_all = words_forDocument();
@@ -351,6 +356,11 @@ void Mainwindow::load_page(int n) {
 void Mainwindow::load_page(int n) {
     d->pageno = n;
     d->pdfpage = d->document->page(d->pageno);
+    auto &&pagesize = d->pdfpage->pageSizeF();
+    d->pageViewSize = pagesize * d->scale;
+    d->normalizedTransform.reset();
+    d->normalizedTransform.scale(pagesize.width(), pagesize.height());
+
     cout << "load page:" << n << endl;
 
     d->words_page_all = words_forCurPage();
@@ -359,50 +369,59 @@ void Mainwindow::load_page(int n) {
 
     d->model->setStringList(d->words_page_afterFilter);
 
-    // highlight word.
-    auto myann = new Poppler::HighlightAnnotation;
-    myann->setHighlightType(Poppler::HighlightAnnotation::Highlight);
-
-    // myann->setBoundary(region);
-    //
-    const QList<Poppler::HighlightAnnotation::Quad> quads = {
-        {{{0, 0.1}, {0.2, 0.3}, {0.4, 0.5}, {0.6, 0.7}}, false, false, 0},
-        // {{{0.8, 0.9}, {0.1, 0.2}, {0.3, 0.4}, {0.5, 0.6}}, true, false, 0.4}
-    };
-    myann->setHighlightQuads(quads);
-    Poppler::Annotation::Style styl;
-    styl.setColor(Qt::red);
-    styl.setOpacity(0.5);
-    myann->setStyle(styl);
-
-    // d->pdfpage->addAnnotation(myann);
-    double width = d->pdfpage->pageSizeF().width();
-    double height = d->pdfpage->pageSizeF().height();
-    // d->pdfpage->removeAnnotation();
     if (0) {
+        // highlight word test.
+        auto myann = new Poppler::HighlightAnnotation;
+        myann->setHighlightType(Poppler::HighlightAnnotation::Highlight);
+
+        // myann->setBoundary(region);
+        //
+        const QList<Poppler::HighlightAnnotation::Quad> quads = {
+            {{{0, 0.1}, {0.2, 0.3}, {0.4, 0.5}, {0.6, 0.7}}, false, false, 0},
+            // {{{0.8, 0.9}, {0.1, 0.2}, {0.3, 0.4}, {0.5, 0.6}}, true, false, 0.4}
+        };
+        myann->setHighlightQuads(quads);
+    }
+
+    if (1) {
         for (auto &w : d->words_page_afterFilter) {
             auto tx = d->pdfpage->textList();
             QString carried;
             for (auto i = tx.begin(); i < tx.end(); i++) {
                 auto cur = (*i)->text().simplified();
-                auto rect = (*i)->boundingBox();
-
-                qDebug() << QString("rect: (%1, %2, %3, %4)")
-                                .arg(rect.top() / height)
-                                .arg(rect.left() / width)
-                                .arg(rect.right() / width)
-                                .arg(rect.bottom() / height);
 
                 if (auto res = getWord(carried, cur); res.isEmpty()) {
                     continue;
                 } else {
                     cur = res;
                     if (cur == w) {
-                        auto region = (*i)->boundingBox();
+                        // TODO: add id for annotations for management and deletion.
+                        auto box = (*i)->boundingBox();
+                        // NOTE: from qpdfview.
+                        auto boundary = d->normalizedTransform.inverted().mapRect(box);
+                        qDebug() << __PRETTY_FUNCTION__;
+                        qDebug() << box;
+                        qDebug() << boundary;
+                        QList<Poppler::HighlightAnnotation::Quad> quads;
+                        {
+                            Poppler::HighlightAnnotation::Quad quad{{}, true, true, 0.1};
+                            quad.points[0] = boundary.topLeft();
+                            quad.points[1] = boundary.topRight();
+                            quad.points[2] = boundary.bottomRight();
+                            quad.points[3] = boundary.bottomLeft();
+                            quads.push_back(quad);
+                        }
+
+                        Poppler::Annotation::Style styl;
+                        styl.setColor(Qt::red);
+                        styl.setOpacity(0.5);
 
                         auto myann = new Poppler::HighlightAnnotation;
-                        myann->setHighlightType(Poppler::HighlightAnnotation::Underline);
-                        myann->setBoundary(region);
+                        // myann->setHighlightType(Poppler::HighlightAnnotation::Underline);
+                        myann->setHighlightQuads(quads);
+                        myann->setBoundary(boundary);
+
+                        myann->setStyle(styl);
                         d->pdfpage->addAnnotation(myann);
                     }
                 }
@@ -599,9 +618,9 @@ void Mainwindow::update_image() {
     // * d->scale);
     auto [xres, yres] = make_pair(72, 72);
 
-    auto image = d->pdfpage->renderToImage(d->scale * xres, d->scale *yres, 0, 0,
-                                           d->pdfpage->pageSize().width() * d->scale,
-                                           d->pdfpage->pageSize().height() * d->scale);
+    auto image =
+        d->pdfpage->renderToImage(d->scale * xres, d->scale * yres, 0, 0,
+                                  d->pageViewSize.width(), d->pageViewSize.height());
     d->label->setPixmap(QPixmap::fromImage(image));
 }
 void Mainwindow::test_scan_annotations() {
@@ -613,7 +632,4 @@ void Mainwindow::test_scan_annotations() {
         }
     }
 }
-void Mainwindow::load_settings() {
-    d->scale = Settings::instance()->pageScale();
-}
-
+void Mainwindow::load_settings() { d->scale = Settings::instance()->pageScale(); }

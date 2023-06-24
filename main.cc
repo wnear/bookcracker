@@ -8,6 +8,7 @@ using namespace std;
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     app.setApplicationName("pdf-vocabulary-builder");
+    app.setAttribute(Qt::AA_UseHighDpiPixmaps);
     Mainwindow w;
     w.show();
 

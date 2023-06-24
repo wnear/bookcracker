@@ -58,7 +58,7 @@ QString getWord(QString &carried, QString cur) {
 class Mainwindow::Private {
   public:
     // settings
-    double scale = 1.0;
+    double scale = 2.5;
 
     // gui
     QTextEdit *x{nullptr};
@@ -244,7 +244,7 @@ void Mainwindow::openFile(const QString &filename) {
     d->document = Poppler::Document::load(filename);
     // cout <<"backend: "<< d->document->availableRenderBackends().size()<<endl;
     // cout << "backend: now"<< d->document->renderBackend() << endl;
-    d->document->setRenderBackend(Poppler::Document::QPainterBackend);
+    // d->document->setRenderBackend(Poppler::Document::QPainterBackend);
     d->document->setRenderHint(Poppler::Document::Antialiasing);
     d->document->setRenderHint(Poppler::Document::TextAntialiasing);
     d->pagewidth = d->label->width();
@@ -532,7 +532,7 @@ QStringList Mainwindow::words_forDocument() {
         QString carried = "";
         auto tx = page->textList();
         for (auto i = tx.begin(); i < tx.end(); i++) {
-            auto cur = i->get()->text().simplified();
+            auto cur = (*i)->text().simplified();
             if (auto res = getWord(carried, cur); res.isEmpty()) {
                 continue;
             } else {
@@ -599,7 +599,7 @@ void Mainwindow::update_image() {
     // * d->scale);
     auto [xres, yres] = make_pair(72, 72);
 
-    auto image = d->pdfpage->renderToImage(xres, yres, 0, 0,
+    auto image = d->pdfpage->renderToImage(d->scale * xres, d->scale *yres, 0, 0,
                                            d->pdfpage->pageSize().width() * d->scale,
                                            d->pdfpage->pageSize().height() * d->scale);
     d->label->setPixmap(QPixmap::fromImage(image));

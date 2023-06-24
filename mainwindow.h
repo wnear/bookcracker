@@ -12,6 +12,8 @@ class Mainwindow : public QMainWindow {
     void openFile(const QString &filename);
 
   private:
+    void load_settings();
+
     void load_page(int n);
 
     void go_next();

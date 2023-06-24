@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "words.h"
+#include "settings.h"
 // #include <poppler-qt6.h>
 #include <iostream>
 #include <algorithm>
@@ -230,6 +231,8 @@ Mainwindow::Mainwindow() {
     splitter->addWidget(wordwgt);
     splitter->addWidget(pageShower);
     this->setCentralWidget(splitter);
+
+    load_settings();
     this->resize(100, 100);
 }
 
@@ -416,14 +419,17 @@ void Mainwindow::scale_bigger() {
         return;
     }
     d->scale += 0.2;
+    Settings::instance()->setPageScale(d->scale);
     update_image();
 }
 
 void Mainwindow::scale_smaller() {
-    if (d->scale <= 0.1) {
+    if (d->scale <= 0.2) {
         return;
     }
     d->scale -= 0.1;
+    Settings::instance()->setPageScale(d->scale);
+
     update_image();
 }
 
@@ -583,12 +589,6 @@ bool Mainwindow::shouldShowWordType(WordType wt) const {
     return false;
 }
 void Mainwindow::update_image() {
-    int width = d->pagewidth;
-    if (d->pagewidth == -1) {
-        width = d->label->width() * 2;
-    }
-    width = d->label->width() * 2;
-
     // FIXME: compile fail. even with `CONFIG += C++20`
     // cout << std::format("renderToImage parameters: width:{}", width)<<endl;
 
@@ -613,3 +613,7 @@ void Mainwindow::test_scan_annotations() {
         }
     }
 }
+void Mainwindow::load_settings() {
+    d->scale = Settings::instance()->pageScale();
+}
+

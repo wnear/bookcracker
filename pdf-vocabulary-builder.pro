@@ -9,13 +9,13 @@ CONFIG += qt
 CONFIG += C++17
 
 PKGCONFIG += poppler
-PKGCONFIG += poppler-qt5
+PKGCONFIG += poppler-qt$${QT_MAJOR_VERSION}
 
 TEMPLATE = app
-TARGET = pdf-vocabulary-builder
+TARGET = bookcracker
 INCLUDEPATH += .
 INCLUDEPATH += /usr/include/poppler
-INCLUDEPATH += /usr/include/poppler/qt5
+INCLUDEPATH += /usr/include/poppler/qt$${QT_MAJOR_VERSION}
 
 
 # You can make your code fail to compile if you use deprecated APIs.

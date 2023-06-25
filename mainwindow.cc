@@ -6,8 +6,20 @@
 #include <algorithm>
 #include <format>
 
-#include <poppler/qt5/poppler-qt5.h>
-#include <poppler/qt5/poppler-annotation.h>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+
+#include <poppler-qt6.h>
+
+#elif QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
+
+#include <poppler-qt5.h>
+
+#else
+
+#include <poppler-qt4.h>
+
+#endif  // QT_VERSION
+#include <poppler-annotation.h>
 #include <QTextEdit>
 #include <QListWidget>
 #include <QListView>
@@ -57,6 +69,18 @@ QString getWord(QString &carried, QString cur) {
     }
     return QString::fromStdString(cur_word);
 }
+
+void removeSeletedRowsFromView(QAbstractItemView *view) {
+    auto selections = view->selectionModel()->selectedIndexes();
+    if(selections.isEmpty())
+        return;
+    // sort indexes with  x.row() from big to small.
+    std::sort(selections.begin(), selections.end(), [](auto &&l, auto &&r) { return l.row() > r.row(); });
+    auto model = view->model();
+    for (auto idx : selections) {
+        model->removeRow(idx.row());
+    }
+}
 }  // namespace
 class Mainwindow::Private {
   public:
@@ -78,19 +102,20 @@ class Mainwindow::Private {
     // pdf dispay helper
     QTransform normalizedTransform;
     QSizeF pageViewSize;
+    QSizeF pageSize;
 
     // pdf
     QString filename;
     int pageno{0};
     int pagewidth = -1;
 
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+    // #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
     std::unique_ptr<Poppler::Page> pdfpage{nullptr};
     std::unique_ptr<Poppler::Document> document{nullptr};
-#else
-    Poppler::Page *pdfpage{nullptr};
-    Poppler::Document *document{nullptr};
-#endif
+    // #else
+    //     Poppler::Page *pdfpage{nullptr};
+    //     Poppler::Document *document{nullptr};
+    // #endif
 
     std::unique_ptr<TextSave> wordstore{nullptr};
     // data, should be consistent.
@@ -100,6 +125,7 @@ class Mainwindow::Private {
     QStringList words_page_all;          // all words in current page.
     QStringList words_page_afterFilter;  // after filter.
     set<QString> words_page_afterFilter_set;
+
     QStringList words_docu_all;          // all words in current page.
     QStringList words_docu_afterFilter;  // after filter.
     //
@@ -127,14 +153,13 @@ Mainwindow::Mainwindow() {
             menu->addAction("test");
             menu->addAction("knew", [this]() {
                 // auto cur = d->listview.
-                auto selectionmodel = d->listview->selectionModel();
-                for (auto idx : selectionmodel->selectedIndexes()) {
+                auto sel_model = d->listview->selectionModel();
+                for (auto idx : sel_model->selectedIndexes()) {
                     auto data = d->model->itemData(idx);
                     d->words_knew.insert(data[0].toString());
                     d->wordstore->addWordToKnown(data[0].toString());
                 }
-                update_filter();
-                cout << selectionmodel->selectedIndexes().size() << endl;
+                removeSeletedRowsFromView(d->listview);
             });
             menu->addAction("ignore", [this]() {
                 // auto cur = d->listview.
@@ -144,7 +169,7 @@ Mainwindow::Mainwindow() {
                     d->words_ignore.insert(data[0].toString());
                     d->wordstore->addWordToIgnore(data[0].toString());
                 }
-                update_filter();
+                removeSeletedRowsFromView(d->listview);
             });
             menu->addAction("add to dict", [this]() {
                 // auto cur = d->listview.
@@ -154,7 +179,7 @@ Mainwindow::Mainwindow() {
                     d->words_ignore.insert(data[0].toString());
                     d->wordstore->addWordToIgnore(data[0].toString());
                 }
-                update_filter();
+                removeSeletedRowsFromView(d->listview);
             });
 
             menu->exec(mapToGlobal(pos));
@@ -249,12 +274,12 @@ void Mainwindow::openFile(const QString &filename) {
         return;
     }
 
-    d->document = Poppler::Document::load(filename);
+    d->document = std::unique_ptr<Poppler::Document>(Poppler::Document::load(filename));
     // cout <<"backend: "<< d->document->availableRenderBackends().size()<<endl;
     // cout << "backend: now"<< d->document->renderBackend() << endl;
     // d->document->setRenderBackend(Poppler::Document::QPainterBackend);
-    // d->document->setRenderHint(Poppler::Document::Antialiasing);
-    // d->document->setRenderHint(Poppler::Document::TextAntialiasing);
+    d->document->setRenderHint(Poppler::Document::Antialiasing);
+    d->document->setRenderHint(Poppler::Document::TextAntialiasing);
     d->pagewidth = d->label->width();
     // this function will only run once, update later.
     d->words_docu_all = words_forDocument();
@@ -278,15 +303,9 @@ void Mainwindow::go_to(int n) {
     this->load_page(d->pageno);
 }
 
-void Mainwindow::go_previous() {
-    cout << __func__ << endl;
-    this->go_to(d->pageno - 1);
-}
+void Mainwindow::go_previous() { this->go_to(d->pageno - 1); }
 
-void Mainwindow::go_next() {
-    cout << __func__ << endl;
-    this->go_to(d->pageno + 1);
-}
+void Mainwindow::go_next() { this->go_to(d->pageno + 1); }
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 void Mainwindow::load_page(int n) {
@@ -355,11 +374,11 @@ void Mainwindow::load_page(int n) {
 #else
 void Mainwindow::load_page(int n) {
     d->pageno = n;
-    d->pdfpage = d->document->page(d->pageno);
-    auto &&pagesize = d->pdfpage->pageSizeF();
-    d->pageViewSize = pagesize * d->scale;
+    // d->pdfpage = d->document->page(d->pageno);
+    d->pdfpage = std::unique_ptr<Poppler::Page>(d->document->page(d->pageno));
+    d->pageSize = d->pdfpage->pageSizeF();
     d->normalizedTransform.reset();
-    d->normalizedTransform.scale(pagesize.width(), pagesize.height());
+    d->normalizedTransform.scale(d->pageSize.width(), d->pageSize.height());
 
     cout << "load page:" << n << endl;
 
@@ -399,9 +418,9 @@ void Mainwindow::load_page(int n) {
                         auto box = (*i)->boundingBox();
                         // NOTE: from qpdfview.
                         auto boundary = d->normalizedTransform.inverted().mapRect(box);
-                        qDebug() << __PRETTY_FUNCTION__;
-                        qDebug() << box;
-                        qDebug() << boundary;
+                        // qDebug() << __PRETTY_FUNCTION__;
+                        // qDebug() << box;
+                        // qDebug() << boundary;
                         QList<Poppler::HighlightAnnotation::Quad> quads;
                         {
                             Poppler::HighlightAnnotation::Quad quad{{}, true, true, 0.1};
@@ -477,15 +496,10 @@ QStringList Mainwindow::do_filter(const QStringList &wordlist) {
 
 void Mainwindow::update_filter() {
     if (d->scopeIsPage) {
-        cout << __func__ << "before, size:" << d->words_page_afterFilter.size() << endl;
         d->words_page_afterFilter = do_filter(d->words_page_all);
-
-        cout << __func__ << "after, size:" << d->words_page_afterFilter.size() << endl;
         d->model->setStringList(d->words_page_afterFilter);
     } else {
-        cout << __func__ << "before, size:" << d->words_docu_afterFilter.size() << endl;
         d->words_docu_afterFilter = do_filter(d->words_docu_all);
-        cout << __func__ << "before, size:" << d->words_docu_afterFilter.size() << endl;
         d->model->setStringList(d->words_docu_afterFilter);
     }
 }
@@ -617,10 +631,11 @@ void Mainwindow::update_image() {
     // auto [xres, yres] = make_pair(this->physicalDpiY() * d->scale, this->physicalDpiY()
     // * d->scale);
     auto [xres, yres] = make_pair(72, 72);
+    auto page_view_size = d->pageSize * d->scale;
 
     auto image =
         d->pdfpage->renderToImage(d->scale * xres, d->scale * yres, 0, 0,
-                                  d->pageViewSize.width(), d->pageViewSize.height());
+                                  page_view_size.width(), page_view_size.height());
     d->label->setPixmap(QPixmap::fromImage(image));
 }
 void Mainwindow::test_scan_annotations() {

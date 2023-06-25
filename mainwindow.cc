@@ -221,18 +221,14 @@ Mainwindow::Mainwindow() {
         {
             d->btn_showdict = new QCheckBox("Show word in dict");
             lay->addWidget(d->btn_showdict);
-            // connect(d->btn_showdict, &QPushButton::clicked, d->btn_showdict,
-            // &QPushButton::toggle);
             connect(d->btn_showdict, &QAbstractButton::clicked, this,
                     &Mainwindow::update_filter);
         }
 
-        if (1) {
+        {
             d->btn_showConciseWordOnly = new QCheckBox("Show concise word only");
             // d->btn_showConciseWordOnly->setChecked();
             lay->addWidget(d->btn_showConciseWordOnly);
-            // connect(d->btn_showcapitalword, &QPushButton::clicked,
-            // d->btn_showcapitalword, &QPushButton::toggle);
             connect(d->btn_showConciseWordOnly, &QAbstractButton::clicked, this,
                     &Mainwindow::update_filter);
         }
@@ -247,11 +243,10 @@ Mainwindow::Mainwindow() {
             });
         }
         if (0) {
+            //NOTE: replace with concise mode btn...
             d->btn_showConciseOnly = new QCheckBox("Show word with captical word");
             d->btn_showConciseOnly->setChecked(true);
             lay->addWidget(d->btn_showConciseOnly);
-            // connect(d->btn_showConciseOnly, &QPushButton::clicked,
-            // d->btn_showConciseOnly, &QPushButton::toggle);
             connect(d->btn_showConciseOnly, &QAbstractButton::clicked, this,
                     &Mainwindow::update_filter);
         }

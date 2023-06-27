@@ -72,10 +72,10 @@ QString getWord(QString &carried, QString cur) {
 
 void removeSeletedRowsFromView(QAbstractItemView *view) {
     auto selections = view->selectionModel()->selectedIndexes();
-    if(selections.isEmpty())
-        return;
+    if (selections.isEmpty()) return;
     // sort indexes with  x.row() from big to small.
-    std::sort(selections.begin(), selections.end(), [](auto &&l, auto &&r) { return l.row() > r.row(); });
+    std::sort(selections.begin(), selections.end(),
+              [](auto &&l, auto &&r) { return l.row() > r.row(); });
     auto model = view->model();
     for (auto idx : selections) {
         model->removeRow(idx.row());
@@ -112,6 +112,7 @@ class Mainwindow::Private {
     // #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
     std::unique_ptr<Poppler::Page> pdfpage{nullptr};
     std::unique_ptr<Poppler::Document> document{nullptr};
+    Outline_t outline;
     // #else
     //     Poppler::Page *pdfpage{nullptr};
     //     Poppler::Document *document{nullptr};
@@ -243,7 +244,7 @@ Mainwindow::Mainwindow() {
             });
         }
         if (0) {
-            //NOTE: replace with concise mode btn...
+            // NOTE: replace with concise mode btn...
             d->btn_showConciseOnly = new QCheckBox("Show word with captical word");
             d->btn_showConciseOnly->setChecked(true);
             lay->addWidget(d->btn_showConciseOnly);
@@ -275,6 +276,9 @@ void Mainwindow::openFile(const QString &filename) {
     // d->document->setRenderBackend(Poppler::Document::QPainterBackend);
     d->document->setRenderHint(Poppler::Document::Antialiasing);
     d->document->setRenderHint(Poppler::Document::TextAntialiasing);
+    d->document->outline();
+    load_outline();
+    display_outline();
     d->pagewidth = d->label->width();
     // this function will only run once, update later.
     d->words_docu_all = words_forDocument();
@@ -643,3 +647,49 @@ void Mainwindow::test_scan_annotations() {
     }
 }
 void Mainwindow::load_settings() { d->scale = Settings::instance()->pageScale(); }
+
+void load_section_cur(Section &section, Poppler::OutlineItem &item) {
+    section.title = item.name();
+    auto dest = item.destination();
+    if (dest) section.link.page = dest->pageNumber();
+    for (auto i : item.children()) {
+        Section sub;
+        load_section_cur(sub, i);
+        section.children.push_back(sub);
+    }
+}
+
+void Mainwindow::load_outline() {
+    d->outline.clear();
+
+    auto items = d->document->outline();
+    if (items.isEmpty()) {
+        cout << "no outine available.";
+    }
+    for (auto i : items) {
+        Section cur_section;
+        load_section_cur(cur_section, i);
+        if (cur_section.link.page == -1) {
+            // TODO:
+            // maybe exit from here.
+        }
+        d->outline.push_back(cur_section);
+    }
+}
+
+void display_section_cur(const Section &sect, int depth = 0) {
+    for (int i = 0; i < depth; i++) cout << "    ";  // use indent as layer indicator.
+    qDebug() << QString("level %1 %2 at page %3")
+                    .arg(depth)
+                    .arg(sect.title)
+                    .arg(sect.link.page);
+    for (auto sub : sect.children) {
+        display_section_cur(sub, depth + 1);
+    }
+}
+void Mainwindow::display_outline() {
+    for (auto sec : d->outline) {
+        display_section_cur(sec);
+    }
+}
+

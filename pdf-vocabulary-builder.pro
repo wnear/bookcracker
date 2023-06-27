@@ -7,6 +7,7 @@ QT += widgets network xml multimedia core opengl
 CONFIG += link_pkgconfig
 CONFIG += qt
 CONFIG += C++17
+CONFIG += debug_and_release
 
 PKGCONFIG += poppler
 PKGCONFIG += poppler-qt$${QT_MAJOR_VERSION}

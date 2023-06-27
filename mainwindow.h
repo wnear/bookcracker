@@ -1,6 +1,26 @@
 
 #include <QMainWindow>
 
+
+struct Position;
+struct Section;
+using Outline_t = std::vector<Section>;
+
+struct Position {
+    QString urlOrFilename;
+    int page{-1};
+    QPointF left_top;
+    QRectF boundry;
+};
+
+struct Section {
+    QString title;
+    Position link;
+    Outline_t children;
+};
+
+
+
 class Mainwindow : public QMainWindow {
   public:
     enum WordType { KNEW, DICT, IGNORED, NEW };
@@ -15,6 +35,10 @@ class Mainwindow : public QMainWindow {
     void load_settings();
 
     void load_page(int n);
+
+    void load_outline();
+    //NOTE: debug
+    void display_outline();
 
     void go_next();
     void go_previous();

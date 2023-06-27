@@ -46,6 +46,7 @@ using namespace std;
 
 namespace {
 QString getWord(QString &carried, QString cur) {
+    auto orig = cur.toStdString();
     if (cur.endsWith("-")) {
         cur.chop(1);
         carried += cur;
@@ -56,18 +57,24 @@ QString getWord(QString &carried, QString cur) {
         carried.clear();
     }
 
-    string cur_word;
-    // deal with punc and numbers.
-    for (auto c : cur.toStdString()) {
-        if (isalpha(c) or isdigit(c) or c == '-') {
-            cur_word.push_back(c);
+    string res;
+    size_t i = 0;
+    for (; i < orig.size(); i++) {
+        if (!isalpha(orig[i])) {
+            continue;
+        } else {
+            break;
         }
-        if (c == '\'') break;
     }
-    if (cur_word.empty()) {
-        return "";
+    for (; i < orig.size(); i++) {
+        if (isalpha(orig[i])) {
+            res.push_back(orig[i]);
+        } else {
+            break;
+        }
     }
-    return QString::fromStdString(cur_word);
+
+    return QString::fromStdString(res);
 }
 
 void removeSeletedRowsFromView(QAbstractItemView *view) {

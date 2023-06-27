@@ -199,19 +199,33 @@ Mainwindow::Mainwindow() {
     {
         {
             auto btn_lay = new QHBoxLayout;
-            auto btn1 = new QPushButton("prev", this);
+
+            auto btn1 = new QToolButton(this);
+            btn1->setIcon(QIcon::fromTheme("arrow-left"));
+            btn1->setIconSize({48, 48});
             btn_lay->addWidget(btn1);
-            connect(btn1, &QPushButton::clicked, this, &Mainwindow::go_previous);
-            auto btn2 = new QPushButton("next", this);
+            connect(btn1, &QAbstractButton::clicked, this, &Mainwindow::go_previous);
+
+            auto btn2 = new QToolButton(this);
+            btn2->setIcon(QIcon::fromTheme("arrow-right"));
+            btn2->setIconSize({48, 48});
             btn_lay->addWidget(btn2);
-            connect(btn2, &QPushButton::clicked, this, &Mainwindow::go_next);
-            auto btn3 = new QPushButton("big", this);
+            connect(btn2, &QAbstractButton::clicked, this, &Mainwindow::go_next);
+
+            auto btn3 = new QToolButton(this);
+            btn3->setIcon(QIcon::fromTheme("zoom-in"));
+            btn3->setIconSize({48, 48});
             btn_lay->addWidget(btn3);
-            connect(btn3, &QPushButton::clicked, this, &Mainwindow::scale_bigger);
-            auto btn4 = new QPushButton("small", this);
+            connect(btn3, &QAbstractButton::clicked, this, &Mainwindow::scale_bigger);
+
+            auto btn4 = new QToolButton(this);
+            btn4->setIcon(QIcon::fromTheme("zoom-out"));
+            btn4->setIconSize({48, 48});
             btn_lay->addWidget(btn4);
-            connect(btn4, &QPushButton::clicked, this, &Mainwindow::scale_smaller);
+            connect(btn4, &QAbstractButton::clicked, this, &Mainwindow::scale_smaller);
+
             auto btn5 = new QPushButton("xx");
+            btn5->setIconSize({48, 48});
             btn_lay->addWidget(btn5);
             pageLay->addLayout(btn_lay);
             pageLay->addSpacerItem(new QSpacerItem(1, 1));

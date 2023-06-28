@@ -39,6 +39,7 @@
 
 #include <QToolButton>
 #include <QMenu>
+#include <QLineEdit>
 
 #include <QDebug>
 
@@ -106,6 +107,10 @@ class Mainwindow::Private {
     QPushButton *btn_about;
     QPushButton *btn_scanscope;
 
+    // beware, it's 1-idnexed.
+    QLineEdit *edit_setPage{nullptr};
+    QLabel *label_showPageNo{nullptr};
+
     // pdf dispay helper
     QTransform normalizedTransform;
     QSizeF pageViewSize;
@@ -147,6 +152,10 @@ class Mainwindow::Private {
 
 Mainwindow::Mainwindow() {
     d = new Private;
+    auto base = new QWidget;
+    auto baseVbox = new QVBoxLayout;
+    base->setLayout(baseVbox);
+
     auto splitter = new QSplitter(this);
     // d->listwidget = new QListWidget(this);
     d->wordstore = make_unique<TextSave>();
@@ -194,48 +203,6 @@ Mainwindow::Mainwindow() {
         });
     }
     // d->listwidget->setModelColumn
-    auto pageShower = new QWidget(this);
-    auto pageLay = new QVBoxLayout;
-    {
-        {
-            auto btn_lay = new QHBoxLayout;
-
-            auto btn1 = new QToolButton(this);
-            btn1->setIcon(QIcon::fromTheme("arrow-left"));
-            btn1->setIconSize({48, 48});
-            btn_lay->addWidget(btn1);
-            connect(btn1, &QAbstractButton::clicked, this, &Mainwindow::go_previous);
-
-            auto btn2 = new QToolButton(this);
-            btn2->setIcon(QIcon::fromTheme("arrow-right"));
-            btn2->setIconSize({48, 48});
-            btn_lay->addWidget(btn2);
-            connect(btn2, &QAbstractButton::clicked, this, &Mainwindow::go_next);
-
-            auto btn3 = new QToolButton(this);
-            btn3->setIcon(QIcon::fromTheme("zoom-in"));
-            btn3->setIconSize({48, 48});
-            btn_lay->addWidget(btn3);
-            connect(btn3, &QAbstractButton::clicked, this, &Mainwindow::scale_bigger);
-
-            auto btn4 = new QToolButton(this);
-            btn4->setIcon(QIcon::fromTheme("zoom-out"));
-            btn4->setIconSize({48, 48});
-            btn_lay->addWidget(btn4);
-            connect(btn4, &QAbstractButton::clicked, this, &Mainwindow::scale_smaller);
-
-            auto btn5 = new QPushButton("xx");
-            btn5->setIconSize({48, 48});
-            btn_lay->addWidget(btn5);
-            pageLay->addLayout(btn_lay);
-            pageLay->addSpacerItem(new QSpacerItem(1, 1));
-        }
-
-        d->label = new QLabel(this);
-        pageLay->addWidget(d->label);
-    }
-
-    pageShower->setLayout(pageLay);
     auto wordwgt = new QWidget;
     {
         auto lay = new QVBoxLayout;
@@ -274,10 +241,75 @@ Mainwindow::Mainwindow() {
         }
         lay->addWidget(d->listview);
     }
+    auto pageShower = new QWidget(this);
+    auto pageLay = new QVBoxLayout;
+    {
+        d->label = new QLabel(this);
+        pageLay->addWidget(d->label);
+    }
+
+    pageShower->setLayout(pageLay);
 
     splitter->addWidget(wordwgt);
     splitter->addWidget(pageShower);
-    this->setCentralWidget(splitter);
+
+    {
+        // as toolbar.
+        auto toolbar_lay = new QHBoxLayout;
+
+        auto btn_showoutline = new QToolButton(this);
+        btn_showoutline->setIcon(QIcon::fromTheme("arrow-left"));
+        btn_showoutline->setIconSize({32, 32});
+        toolbar_lay->addWidget(btn_showoutline);
+        connect(btn_showoutline, &QAbstractButton::clicked, this, [=]() {
+            // wordwgt->isHidden();
+            wordwgt->setHidden(!wordwgt->isHidden());
+        });
+        d->edit_setPage= new QLineEdit(this);
+        d->edit_setPage->setFixedWidth(100);
+        d->edit_setPage->setAlignment(Qt::AlignRight);
+        toolbar_lay->addWidget(d->edit_setPage);
+        // toolbar_lay->addWidget(new QLabel(" of "));
+        d->label_showPageNo = new QLabel(this);
+        toolbar_lay->addWidget(d->label_showPageNo);
+        connect(d->edit_setPage, &QLineEdit::returnPressed, this, [this](){
+            auto txt = d->edit_setPage->text();
+            this->go_to(txt.toInt()-1);
+        });
+
+        auto btn1 = new QToolButton(this);
+        btn1->setIcon(QIcon::fromTheme("arrow-left"));
+        btn1->setIconSize({32, 32});
+        toolbar_lay->addWidget(btn1);
+        connect(btn1, &QAbstractButton::clicked, this, &Mainwindow::go_previous);
+
+        auto btn2 = new QToolButton(this);
+        btn2->setIcon(QIcon::fromTheme("arrow-right"));
+        btn2->setIconSize({32, 32});
+        toolbar_lay->addWidget(btn2);
+        connect(btn2, &QAbstractButton::clicked, this, &Mainwindow::go_next);
+
+        auto btn3 = new QToolButton(this);
+        btn3->setIcon(QIcon::fromTheme("zoom-in"));
+        btn3->setIconSize({32, 32});
+        toolbar_lay->addWidget(btn3);
+        connect(btn3, &QAbstractButton::clicked, this, &Mainwindow::scale_bigger);
+
+        auto btn4 = new QToolButton(this);
+        btn4->setIcon(QIcon::fromTheme("zoom-out"));
+        btn4->setIconSize({32, 32});
+        toolbar_lay->addWidget(btn4);
+        connect(btn4, &QAbstractButton::clicked, this, &Mainwindow::scale_smaller);
+
+        auto btn5 = new QPushButton("xx");
+        btn5->setIconSize({32, 32});
+        toolbar_lay->addWidget(btn5);
+        toolbar_lay->addStretch(1);
+        baseVbox->addLayout(toolbar_lay);
+    }
+    baseVbox->addWidget(splitter);
+
+    this->setCentralWidget(base);
 
     load_settings();
     this->resize(100, 100);
@@ -292,6 +324,8 @@ void Mainwindow::openFile(const QString &filename) {
     }
 
     d->document = std::unique_ptr<Poppler::Document>(Poppler::Document::load(filename));
+    d->label_showPageNo->setText(QString(" of %1").arg(d->document->numPages()));
+    d->edit_setPage->setValidator(new QIntValidator(1, d->document->numPages(), this));
     // cout <<"backend: "<< d->document->availableRenderBackends().size()<<endl;
     // cout << "backend: now"<< d->document->renderBackend() << endl;
     // d->document->setRenderBackend(Poppler::Document::QPainterBackend);
@@ -394,6 +428,7 @@ void Mainwindow::load_page(int n) {
 #else
 void Mainwindow::load_page(int n) {
     d->pageno = n;
+    d->edit_setPage->setText(QString("%1").arg(d->pageno+1));
     // d->pdfpage = d->document->page(d->pageno);
     d->pdfpage = std::unique_ptr<Poppler::Page>(d->document->page(d->pageno));
     d->pageSize = d->pdfpage->pageSizeF();
@@ -713,4 +748,3 @@ void Mainwindow::display_outline() {
         display_section_cur(sec);
     }
 }
-

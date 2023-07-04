@@ -1,5 +1,7 @@
 #include "mainwindow.h"
 #include "words.h"
+#include "worditem.h"
+#include "wordmodel.h"
 #include "settings.h"
 // #include <poppler-qt6.h>
 #include <iostream>
@@ -99,8 +101,10 @@ class Mainwindow::Private {
     QTextEdit *x{nullptr};
     QLabel *label{nullptr};
     // QListWidget *listwidget{nullptr};
-    QListView *listview{nullptr};
+    QListView *wordlistview{nullptr};
     QStringListModel *model{nullptr};
+    WordModel  *sourceModel{nullptr};
+    WordSortFilterProxyModel *proxyModel{nullptr};
     QCheckBox *btn_showdict{nullptr};
     QCheckBox *btn_showConciseWordOnly{nullptr};
     QCheckBox *btn_showConciseOnly{nullptr};
@@ -138,6 +142,7 @@ class Mainwindow::Private {
     QStringList words_page_all;          // all words in current page.
     QStringList words_page_afterFilter;  // after filter.
     set<QString> words_page_afterFilter_set;
+    QMap<QString, WordItem> wordstruct_in_page;
 
     QStringList words_docu_all;          // all words in current page.
     QStringList words_docu_afterFilter;  // after filter.
@@ -160,43 +165,49 @@ Mainwindow::Mainwindow() {
     // d->listwidget = new QListWidget(this);
     d->wordstore = make_unique<TextSave>();
     {
-        d->listview = new QListView(this);
+        d->wordlistview = new QListView(this);
         d->model = new QStringListModel();
-        d->listview->setModel(d->model);
-        d->listview->setSelectionMode(QAbstractItemView::ExtendedSelection);
-        d->listview->setContextMenuPolicy(Qt::CustomContextMenu);
-        connect(d->listview, &QWidget::customContextMenuRequested, [this](auto &&pos) {
+        d->sourceModel = new WordModel(d->wordstruct_in_page, this);
+        d->proxyModel = new WordSortFilterProxyModel(this);
+        d->proxyModel->setSourceModel(d->sourceModel);
+        // d->proxyModel->setSourceModel(d->model);
+
+        d->wordlistview->setModel(d->proxyModel);
+        d->wordlistview->setSelectionMode(QAbstractItemView::ExtendedSelection);
+        d->wordlistview->setContextMenuPolicy(Qt::CustomContextMenu);
+
+        connect(d->wordlistview, &QWidget::customContextMenuRequested, [this](auto &&pos) {
             auto menu = new QMenu;
             menu->addAction("test");
             menu->addAction("knew", [this]() {
                 // auto cur = d->listview.
-                auto sel_model = d->listview->selectionModel();
+                auto sel_model = d->wordlistview->selectionModel();
                 for (auto idx : sel_model->selectedIndexes()) {
                     auto data = d->model->itemData(idx);
                     d->words_knew.insert(data[0].toString());
                     d->wordstore->addWordToKnown(data[0].toString());
                 }
-                removeSeletedRowsFromView(d->listview);
+                removeSeletedRowsFromView(d->wordlistview);
             });
             menu->addAction("ignore", [this]() {
                 // auto cur = d->listview.
-                auto selectionmodel = d->listview->selectionModel();
+                auto selectionmodel = d->wordlistview->selectionModel();
                 for (auto idx : selectionmodel->selectedIndexes()) {
                     auto data = d->model->itemData(idx);
                     d->words_ignore.insert(data[0].toString());
                     d->wordstore->addWordToIgnore(data[0].toString());
                 }
-                removeSeletedRowsFromView(d->listview);
+                removeSeletedRowsFromView(d->wordlistview);
             });
             menu->addAction("add to dict", [this]() {
                 // auto cur = d->listview.
-                auto selectionmodel = d->listview->selectionModel();
+                auto selectionmodel = d->wordlistview->selectionModel();
                 for (auto idx : selectionmodel->selectedIndexes()) {
                     auto data = d->model->itemData(idx);
                     d->words_ignore.insert(data[0].toString());
                     d->wordstore->addWordToIgnore(data[0].toString());
                 }
-                removeSeletedRowsFromView(d->listview);
+                removeSeletedRowsFromView(d->wordlistview);
             });
 
             menu->exec(mapToGlobal(pos));
@@ -239,7 +250,7 @@ Mainwindow::Mainwindow() {
             connect(d->btn_showConciseOnly, &QAbstractButton::clicked, this,
                     &Mainwindow::update_filter);
         }
-        lay->addWidget(d->listview);
+        lay->addWidget(d->wordlistview);
     }
     auto pageShower = new QWidget(this);
     auto pageLay = new QVBoxLayout;
@@ -353,8 +364,10 @@ void Mainwindow::go_to(int n) {
     if (pageno >= page_max) {
         pageno = page_max - 1;
     }
-    d->pageno = pageno;
-    this->load_page(d->pageno);
+    // wont turn page.
+    if(pageno == d->pageno)
+        return;
+    this->load_page(pageno);
 }
 
 void Mainwindow::go_previous() { this->go_to(d->pageno - 1); }
@@ -426,7 +439,18 @@ void Mainwindow::load_page(int n) {
     update_image();
 }
 #else
+void Mainwindow::load_page_before() {
+    d->sourceModel->reset_data_before();
+    d->wordstruct_in_page.clear();
+}
+void Mainwindow::load_page_after() {
+    cout << "now have word: " << d->wordstruct_in_page.size()<<endl;
+    d->sourceModel->reset_data_after();
+}
 void Mainwindow::load_page(int n) {
+    assert(d->pageno != n);
+    load_page_before();
+
     d->pageno = n;
     d->edit_setPage->setText(QString("%1").arg(d->pageno+1));
     // d->pdfpage = d->document->page(d->pageno);
@@ -439,9 +463,13 @@ void Mainwindow::load_page(int n) {
 
     d->words_page_all = words_forCurPage();
     update_filter();
+    //TODO: reset view.
+    //
+    load_page_after();
+    d->wordlistview->reset();
     // d->words_page_afterFilter = do_filter(d->words_page_all);
 
-    d->model->setStringList(d->words_page_afterFilter);
+    // d->model->setStringList(d->words_page_afterFilter);
 
     if (0) {
         // highlight word test.
@@ -528,6 +556,14 @@ void Mainwindow::scale_smaller() {
 
 QStringList Mainwindow::do_filter(const QStringList &wordlist) {
     QStringList filtered_wordlist;
+    if(d->scopeIsPage){
+        for(auto word: d->wordstruct_in_page.keys()){
+            // auto word = d->wordstruct_in_page[i].content;
+            d->wordstruct_in_page[word].isKnown = d->wordstore->isKnown(word);
+            d->wordstruct_in_page[word].isIgnored = d->wordstore->isIgnored(word);
+            d->wordstruct_in_page[word].isIndict = d->wordstore->isInDict(word);
+        }
+    }
 
     for (auto word : wordlist) {
         // if (d->words_knew.contains(i) || d->words_ignore.contains(i)) continue;
@@ -599,10 +635,20 @@ QStringList Mainwindow::words_forCurPage() {
             if (findRelated) break;
             contains = false;
         } while (0);
+        auto anno_region = make_pair((*i)->boundingBox(), nullptr);
         if (contains) {
+            d->wordstruct_in_page[cur].highlight.push_back(anno_region);
         } else {
             words_cache.insert(cur);
             res.push_back(cur);
+
+            WordItem x;
+            x.original = cur;
+            x.content = cur;
+            x.id = make_pair(d->pageno, std::distance(i, tx.begin()));
+            // x.boundingbox = (*i)->boundingBox();
+            x.highlight = {anno_region};
+            d->wordstruct_in_page[cur] = std::move(x);
         }
     }
     return res;
@@ -748,3 +794,4 @@ void Mainwindow::display_outline() {
         display_section_cur(sec);
     }
 }
+

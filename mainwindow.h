@@ -35,6 +35,11 @@ class Mainwindow : public QMainWindow {
     void load_settings();
 
     void load_page(int n);
+    //NOTE: following two method is called by load_page(),
+    //do the job before and after the page-no is changed,
+    //now maily related to annotation management.
+    void load_page_before();
+    void load_page_after();
 
     void load_outline();
     //NOTE: debug

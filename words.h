@@ -1,6 +1,7 @@
 #pragma once
 #include <QDir>
 #include <set>
+#include "worditem.h"
 
 class Words {
   protected:

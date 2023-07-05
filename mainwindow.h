@@ -1,6 +1,6 @@
 
 #include <QMainWindow>
-
+#include <poppler-annotation.h>
 
 struct Position;
 struct Section;
@@ -19,8 +19,6 @@ struct Section {
     Outline_t children;
 };
 
-
-
 class Mainwindow : public QMainWindow {
   public:
     enum WordType { KNEW, DICT, IGNORED, NEW };
@@ -35,14 +33,14 @@ class Mainwindow : public QMainWindow {
     void load_settings();
 
     void load_page(int n);
-    //NOTE: following two method is called by load_page(),
-    //do the job before and after the page-no is changed,
-    //now maily related to annotation management.
+    // NOTE: following two method is called by load_page(),
+    // do the job before and after the page-no is changed,
+    // now maily related to annotation management.
     void load_page_before();
     void load_page_after();
 
     void load_outline();
-    //NOTE: debug
+    // NOTE: debug
     void display_outline();
 
     void go_next();
@@ -51,6 +49,8 @@ class Mainwindow : public QMainWindow {
     void scale_smaller();
     void update_image();
     void test_scan_annotations();
+
+    Poppler::HighlightAnnotation *make_highlight(QRectF region);
 
     bool shouldShowWordType(WordType wt) const;
 

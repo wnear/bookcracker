@@ -103,7 +103,7 @@ class Mainwindow::Private {
     // QListWidget *listwidget{nullptr};
     QListView *wordlistview{nullptr};
     QStringListModel *model{nullptr};
-    WordModel  *sourceModel{nullptr};
+    WordModel *sourceModel{nullptr};
     WordSortFilterProxyModel *proxyModel{nullptr};
     QCheckBox *btn_showdict{nullptr};
     QCheckBox *btn_showConciseWordOnly{nullptr};
@@ -142,7 +142,7 @@ class Mainwindow::Private {
     QStringList words_page_all;          // all words in current page.
     QStringList words_page_afterFilter;  // after filter.
     set<QString> words_page_afterFilter_set;
-    QMap<QString, WordItem> wordstruct_in_page;
+    WordItemMap wordstruct_in_page;
 
     QStringList words_docu_all;          // all words in current page.
     QStringList words_docu_afterFilter;  // after filter.
@@ -165,6 +165,10 @@ Mainwindow::Mainwindow() {
     // d->listwidget = new QListWidget(this);
     d->wordstore = make_unique<TextSave>();
     {
+        // TODO: about wordlist's view, two versions are needed.
+        //  1. listview. fixed sort order, may configrued in setting,
+        //  2. detail table view, with frequence, meaning, hardlevel,
+        //
         d->wordlistview = new QListView(this);
         d->model = new QStringListModel();
         d->sourceModel = new WordModel(d->wordstruct_in_page, this);
@@ -176,42 +180,43 @@ Mainwindow::Mainwindow() {
         d->wordlistview->setSelectionMode(QAbstractItemView::ExtendedSelection);
         d->wordlistview->setContextMenuPolicy(Qt::CustomContextMenu);
 
-        connect(d->wordlistview, &QWidget::customContextMenuRequested, [this](auto &&pos) {
-            auto menu = new QMenu;
-            menu->addAction("test");
-            menu->addAction("knew", [this]() {
-                // auto cur = d->listview.
-                auto sel_model = d->wordlistview->selectionModel();
-                for (auto idx : sel_model->selectedIndexes()) {
-                    auto data = d->model->itemData(idx);
-                    d->words_knew.insert(data[0].toString());
-                    d->wordstore->addWordToKnown(data[0].toString());
-                }
-                removeSeletedRowsFromView(d->wordlistview);
-            });
-            menu->addAction("ignore", [this]() {
-                // auto cur = d->listview.
-                auto selectionmodel = d->wordlistview->selectionModel();
-                for (auto idx : selectionmodel->selectedIndexes()) {
-                    auto data = d->model->itemData(idx);
-                    d->words_ignore.insert(data[0].toString());
-                    d->wordstore->addWordToIgnore(data[0].toString());
-                }
-                removeSeletedRowsFromView(d->wordlistview);
-            });
-            menu->addAction("add to dict", [this]() {
-                // auto cur = d->listview.
-                auto selectionmodel = d->wordlistview->selectionModel();
-                for (auto idx : selectionmodel->selectedIndexes()) {
-                    auto data = d->model->itemData(idx);
-                    d->words_ignore.insert(data[0].toString());
-                    d->wordstore->addWordToIgnore(data[0].toString());
-                }
-                removeSeletedRowsFromView(d->wordlistview);
-            });
+        connect(d->wordlistview, &QWidget::customContextMenuRequested,
+                [this](auto &&pos) {
+                    auto menu = new QMenu;
+                    menu->addAction("test");
+                    menu->addAction("knew", [this]() {
+                        // auto cur = d->listview.
+                        auto sel_model = d->wordlistview->selectionModel();
+                        for (auto idx : sel_model->selectedIndexes()) {
+                            auto data = d->model->itemData(idx);
+                            d->words_knew.insert(data[0].toString());
+                            d->wordstore->addWordToKnown(data[0].toString());
+                        }
+                        removeSeletedRowsFromView(d->wordlistview);
+                    });
+                    menu->addAction("ignore", [this]() {
+                        // auto cur = d->listview.
+                        auto selectionmodel = d->wordlistview->selectionModel();
+                        for (auto idx : selectionmodel->selectedIndexes()) {
+                            auto data = d->model->itemData(idx);
+                            d->words_ignore.insert(data[0].toString());
+                            d->wordstore->addWordToIgnore(data[0].toString());
+                        }
+                        removeSeletedRowsFromView(d->wordlistview);
+                    });
+                    menu->addAction("add to dict", [this]() {
+                        // auto cur = d->listview.
+                        auto selectionmodel = d->wordlistview->selectionModel();
+                        for (auto idx : selectionmodel->selectedIndexes()) {
+                            auto data = d->model->itemData(idx);
+                            d->words_ignore.insert(data[0].toString());
+                            d->wordstore->addWordToIgnore(data[0].toString());
+                        }
+                        removeSeletedRowsFromView(d->wordlistview);
+                    });
 
-            menu->exec(mapToGlobal(pos));
-        });
+                    menu->exec(mapToGlobal(pos));
+                });
     }
     // d->listwidget->setModelColumn
     auto wordwgt = new QWidget;
@@ -276,16 +281,16 @@ Mainwindow::Mainwindow() {
             // wordwgt->isHidden();
             wordwgt->setHidden(!wordwgt->isHidden());
         });
-        d->edit_setPage= new QLineEdit(this);
+        d->edit_setPage = new QLineEdit(this);
         d->edit_setPage->setFixedWidth(100);
         d->edit_setPage->setAlignment(Qt::AlignRight);
         toolbar_lay->addWidget(d->edit_setPage);
         // toolbar_lay->addWidget(new QLabel(" of "));
         d->label_showPageNo = new QLabel(this);
         toolbar_lay->addWidget(d->label_showPageNo);
-        connect(d->edit_setPage, &QLineEdit::returnPressed, this, [this](){
+        connect(d->edit_setPage, &QLineEdit::returnPressed, this, [this]() {
             auto txt = d->edit_setPage->text();
-            this->go_to(txt.toInt()-1);
+            this->go_to(txt.toInt() - 1);
         });
 
         auto btn1 = new QToolButton(this);
@@ -365,8 +370,7 @@ void Mainwindow::go_to(int n) {
         pageno = page_max - 1;
     }
     // wont turn page.
-    if(pageno == d->pageno)
-        return;
+    if (pageno == d->pageno) return;
     this->load_page(pageno);
 }
 
@@ -440,19 +444,37 @@ void Mainwindow::load_page(int n) {
 }
 #else
 void Mainwindow::load_page_before() {
+    for (auto i : d->wordstruct_in_page.keys()) {
+        auto &hl = d->wordstruct_in_page[i].highlight;
+        for (auto i = hl.begin(); i != hl.end(); i++) {
+            if (i->second != nullptr) {
+                d->pdfpage->removeAnnotation(i->second);
+                i->second = nullptr;
+            }
+        }
+    }
     d->sourceModel->reset_data_before();
     d->wordstruct_in_page.clear();
 }
 void Mainwindow::load_page_after() {
-    cout << "now have word: " << d->wordstruct_in_page.size()<<endl;
+    // cout << "now have word: " << d->wordstruct_in_page.size()<<endl;
     d->sourceModel->reset_data_after();
+    for (auto i : d->wordstruct_in_page.keys()) {
+        auto &hl = d->wordstruct_in_page[i].highlight;
+        auto is_visible = d->wordstruct_in_page[i].isVisible();
+        for (auto i = hl.begin(); i != hl.end(); i++) {
+            if (is_visible && i->second == nullptr) {
+                i->second = this->make_highlight(i->first);
+            }
+        }
+    }
 }
 void Mainwindow::load_page(int n) {
     assert(d->pageno != n);
     load_page_before();
 
     d->pageno = n;
-    d->edit_setPage->setText(QString("%1").arg(d->pageno+1));
+    d->edit_setPage->setText(QString("%1").arg(d->pageno + 1));
     // d->pdfpage = d->document->page(d->pageno);
     d->pdfpage = std::unique_ptr<Poppler::Page>(d->document->page(d->pageno));
     d->pageSize = d->pdfpage->pageSizeF();
@@ -463,16 +485,20 @@ void Mainwindow::load_page(int n) {
 
     d->words_page_all = words_forCurPage();
     update_filter();
-    //TODO: reset view.
-    //
     load_page_after();
+    // TODO: necessary?
+    // maybe: the selection state.
     d->wordlistview->reset();
-    // d->words_page_afterFilter = do_filter(d->words_page_all);
+    d->proxyModel->sort(WordModel::COLUMN_WORD);
+    d->proxyModel->sort(WordModel::COLUMN_POS_IN_PAGE);
 
+    // d->wordlistview->
+    //
+    // d->words_page_afterFilter = do_filter(d->words_page_all);
     // d->model->setStringList(d->words_page_afterFilter);
 
     if (0) {
-        // highlight word test.
+        // demo code, highlight word test.
         auto myann = new Poppler::HighlightAnnotation;
         myann->setHighlightType(Poppler::HighlightAnnotation::Highlight);
 
@@ -483,52 +509,6 @@ void Mainwindow::load_page(int n) {
             // {{{0.8, 0.9}, {0.1, 0.2}, {0.3, 0.4}, {0.5, 0.6}}, true, false, 0.4}
         };
         myann->setHighlightQuads(quads);
-    }
-
-    if (1) {
-        for (auto &w : d->words_page_afterFilter) {
-            auto tx = d->pdfpage->textList();
-            QString carried;
-            for (auto i = tx.begin(); i < tx.end(); i++) {
-                auto cur = (*i)->text().simplified();
-
-                if (auto res = getWord(carried, cur); res.isEmpty()) {
-                    continue;
-                } else {
-                    cur = res;
-                    if (cur == w) {
-                        // TODO: add id for annotations for management and deletion.
-                        auto box = (*i)->boundingBox();
-                        // NOTE: from qpdfview.
-                        auto boundary = d->normalizedTransform.inverted().mapRect(box);
-                        // qDebug() << __PRETTY_FUNCTION__;
-                        // qDebug() << box;
-                        // qDebug() << boundary;
-                        QList<Poppler::HighlightAnnotation::Quad> quads;
-                        {
-                            Poppler::HighlightAnnotation::Quad quad{{}, true, true, 0.1};
-                            quad.points[0] = boundary.topLeft();
-                            quad.points[1] = boundary.topRight();
-                            quad.points[2] = boundary.bottomRight();
-                            quad.points[3] = boundary.bottomLeft();
-                            quads.push_back(quad);
-                        }
-
-                        Poppler::Annotation::Style styl;
-                        styl.setColor(Qt::red);
-                        styl.setOpacity(0.5);
-
-                        auto myann = new Poppler::HighlightAnnotation;
-                        // myann->setHighlightType(Poppler::HighlightAnnotation::Underline);
-                        myann->setHighlightQuads(quads);
-                        myann->setBoundary(boundary);
-
-                        myann->setStyle(styl);
-                        d->pdfpage->addAnnotation(myann);
-                    }
-                }
-            }
-        }
     }
     update_image();
 }
@@ -556,12 +536,21 @@ void Mainwindow::scale_smaller() {
 
 QStringList Mainwindow::do_filter(const QStringList &wordlist) {
     QStringList filtered_wordlist;
-    if(d->scopeIsPage){
-        for(auto word: d->wordstruct_in_page.keys()){
+    if (d->scopeIsPage) {
+        for (auto word : d->wordstruct_in_page.keys()) {
             // auto word = d->wordstruct_in_page[i].content;
-            d->wordstruct_in_page[word].isKnown = d->wordstore->isKnown(word);
-            d->wordstruct_in_page[word].isIgnored = d->wordstore->isIgnored(word);
-            d->wordstruct_in_page[word].isIndict = d->wordstore->isInDict(word);
+            if (d->wordstore->isKnown(word)) {
+                d->wordstruct_in_page[word].wordlevel = WORD_IS_KNOW;
+            }
+            if (d->wordstore->isIgnored(word)) {
+                d->wordstruct_in_page[word].wordlevel = WORD_IS_IGNORED;
+            }
+            if (d->wordstore->isInDict(word)) {
+                d->wordstruct_in_page[word].wordlevel = WORD_IS_LERNING;
+            }
+            // d->wordstruct_in_page[word].isKnown = d->wordstore->isKnown(word);
+            // d->wordstruct_in_page[word].isIgnored = d->wordstore->isIgnored(word);
+            // d->wordstruct_in_page[word].isIndict = d->wordstore->isInDict(word);
         }
     }
 
@@ -646,6 +635,8 @@ QStringList Mainwindow::words_forCurPage() {
             x.original = cur;
             x.content = cur;
             x.id = make_pair(d->pageno, std::distance(i, tx.begin()));
+            x.id_page = d->pageno;
+            x.id_idx = std::distance(i, tx.begin());
             // x.boundingbox = (*i)->boundingBox();
             x.highlight = {anno_region};
             d->wordstruct_in_page[cur] = std::move(x);
@@ -794,4 +785,32 @@ void Mainwindow::display_outline() {
         display_section_cur(sec);
     }
 }
+Poppler::HighlightAnnotation *Mainwindow::make_highlight(QRectF region) {
+    // NOTE: from qpdfview.
+    auto boundary = d->normalizedTransform.inverted().mapRect(region);
+    // qDebug() << __PRETTY_FUNCTION__;
+    // qDebug() << box;
+    // qDebug() << boundary;
+    QList<Poppler::HighlightAnnotation::Quad> quads;
+    {
+        Poppler::HighlightAnnotation::Quad quad{{}, true, true, 0.1};
+        quad.points[0] = boundary.topLeft();
+        quad.points[1] = boundary.topRight();
+        quad.points[2] = boundary.bottomRight();
+        quad.points[3] = boundary.bottomLeft();
+        quads.push_back(quad);
+    }
 
+    Poppler::Annotation::Style styl;
+    styl.setColor(Qt::red);
+    styl.setOpacity(0.5);
+
+    auto myann = new Poppler::HighlightAnnotation;
+    // myann->setHighlightType(Poppler::HighlightAnnotation::Underline);
+    myann->setHighlightQuads(quads);
+    myann->setBoundary(boundary);
+
+    myann->setStyle(styl);
+    d->pdfpage->addAnnotation(myann);
+    return myann;
+}

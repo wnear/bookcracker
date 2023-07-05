@@ -1,5 +1,6 @@
 #include "wordmodel.h"
-
+#include <iostream>
+using namespace std;
 
 QModelIndex WordModel::index(int row, int column, const QModelIndex &parent) const {
     return (row >= 0 && row < this->rowCount()) ? createIndex(row, column, nullptr)
@@ -18,27 +19,54 @@ int WordModel::rowCount(const QModelIndex &parent) const {
 
 int WordModel::columnCount(const QModelIndex &parent) const {
     Q_UNUSED(parent);
-    return 1;
+    return COLUMN_END;
 }
 
 QVariant WordModel::data(const QModelIndex &index, int role) const {
-    if(index.isValid()){
-        if(role == Qt::DisplayRole ){
-            auto data= m_data.value(m_data.keys()[index.row()]);
-            return data.original;
+    if (index.isValid()) {
+        if (role == Qt::DisplayRole) {
+            /*
+                *
+    enum columnx{
+        COLUMN_WORD,
+        COLUMN_PRACTICE_LEVEL,
+        COLUMN_MEANING,
+        COLUMN_PAGE,
+        COLUMN_INPAGEX,
+        COLUMN_END
+    };
+            */
+            auto data = m_data.value(m_data.keys()[index.row()]);
+            switch (index.column()) {
+                case COLUMN_WORD: {
+                    return data.original;
+                }
+                case COLUMN_VISIBLE: {
+                    return data.isVisible();
+                }
+                case COLUMN_MEANING: {
+                    return data.meaning;
+                }
+                case COLUMN_PAGE: {
+                    return data.id_page;
+                }
+                case COLUMN_POS_IN_PAGE: {
+                    return data.id_idx;
+                }
+                default: {
+                    return "";
+                }
+            }
         }
     }
     return QVariant();
 }
 
-
 // Qt::ItemFlags WordModel::flags(const QModelIndex &index) const {}
 WordModel::WordModel(modeldata_t &document, QObject *parent)
     : QAbstractItemModel(parent), m_data(document) {}
 
-void WordSortFilterProxyModel::updateFilter() {
-    invalidateFilter();
-}
+void WordSortFilterProxyModel::updateFilter() { invalidateFilter(); }
 
 // bool WordSortFilterProxyModel::lessThan(const QModelIndex &source_left,
 //                                         const QModelIndex &source_right) const {
@@ -47,6 +75,42 @@ void WordSortFilterProxyModel::updateFilter() {
 
 bool WordSortFilterProxyModel::filterAcceptsRow(int sourceRow,
                                                 const QModelIndex &sourceParent) const {
-    return true;
+    // auto level_col = static_cast<int>(WordModel::COLUMN_PRACTICE_LEVEL);
+    auto isVisible = sourceModel()
+                     ->index(sourceRow, WordModel::COLUMN_VISIBLE, sourceParent)
+                     .data()
+                     .toBool();
+    // auto level = static_cast<wordlevel_t>(idx.data().toInt());
+
+    bool res = isVisible;
+    if (!m_match.isEmpty()) {
+        auto word = sourceModel()
+                        ->index(sourceRow, WordModel::COLUMN_WORD, sourceParent)
+                        .data()
+                        .toString();
+        auto res2 = word.toLower().contains(m_match);
+        res = res and res2;
+    }
+    return res;
+}
+void WordSortFilterProxyModel::setSearchPattern(const QString &ptn) {
+    m_match = ptn.toLower();
+    updateFilter();
 }
 
+void WordSortFilterProxyModel::setFilterCriteria() { updateFilter(); }
+
+bool WordSortFilterProxyModel::lessThan(const QModelIndex &l,
+                                        const QModelIndex &r) const {
+    assert(l.column() == r.column());
+    switch (l.column()) {
+        case WordModel::COLUMN_WORD: {
+            auto cmp =
+                QString::localeAwareCompare(l.data().toString(), r.data().toString());
+            return (cmp < 0);
+        }
+        case WordModel::COLUMN_POS_IN_PAGE:
+            return l.data().toInt() < r.data().toInt();
+    }
+    return true;
+}

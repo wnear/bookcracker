@@ -5,11 +5,28 @@
 #include <QSortFilterProxyModel>
 #include <memory>
 
+//NOTE:  implementation notes:
+//1. column 1 is word. use for wordlist of QListView.
+//1. column 2,3,4, for different usage, may contains:
+//   - word practice level => used in filter model to show/hide.
+//   - word definition, show in widget.
+//   - word rect, used for annotation.
+
+
 class WordModel : public QAbstractItemModel {
     Q_OBJECT
 
   public:
-    using modeldata_t = QMap<QString, WordItem>;
+    using modeldata_t = WordItemMap;
+    enum COLUMN_NO{
+        COLUMN_WORD,
+        COLUMN_VISIBLE,
+        COLUMN_MEANING,
+        COLUMN_PAGE,
+        COLUMN_POS_IN_PAGE,
+        // COLUMN_INPAGE_IDX,
+        COLUMN_END
+    };
     WordModel(modeldata_t &document, QObject *parent = nullptr);
     ~WordModel() = default;
 
@@ -20,12 +37,8 @@ class WordModel : public QAbstractItemModel {
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     int columnCount(const QModelIndex &parent = QModelIndex()) const override;
 
-    void reset_data_before(){
-        beginResetModel();
-    }
-    void reset_data_after(){
-        endResetModel();
-    }
+    void reset_data_before() { beginResetModel(); }
+    void reset_data_after() { endResetModel(); }
 
     // Qt::ItemFlags flags(const QModelIndex &index) const override;
 
@@ -41,24 +54,29 @@ class WordSortFilterProxyModel : public QSortFilterProxyModel {
   public:
     WordSortFilterProxyModel(QObject *parent = nullptr) : QSortFilterProxyModel(parent) {}
 
+    void updateFilter();
+    void setSearchPattern(const QString &ptn);
+    void setFilterCriteria();
+
   protected:
     bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override;
-    // bool lessThan(const QModelIndex &source_left,
-    //               const QModelIndex &source_right) const override;
-    void updateFilter();
+    bool lessThan(const QModelIndex &source_left,
+                  const QModelIndex &source_right) const override;
+    // NOTE: usage, call this after any-word's known/indict/ignore status changed.
 
   private:
+    QString m_match{};
 };
 
+// TODO: may be this one is more suitable than WordModel.
 class WordListModel : public QAbstractListModel {
   public:
-    using modeldata_t = QMap<QString, WordItem>;
-    WordListModel(modeldata_t &document, QObject *parent = nullptr)
-        : QAbstractListModel(parent), m_data(document){};
+    using modeldata_t = WordItemMap;
+    WordListModel(modeldata_t &data, QObject *parent = nullptr)
+        : QAbstractListModel(parent), m_data(data){};
 
     QVariant data(const QModelIndex &index, int role) const override {
         if (role != Qt::DisplayRole) return {};
-        auto x = index.row();
         // if (x < 0 || x >= m_data.length()) return {};
         // auto &&cur = m_data[x];
         switch (role) {
@@ -70,7 +88,7 @@ class WordListModel : public QAbstractListModel {
         return {};
     }
     int rowCount(const QModelIndex &parent = QModelIndex()) const override {
-        return parent.isValid()? 0: m_data.size();
+        return parent.isValid() ? 0 : m_data.size();
     }
 
   private:

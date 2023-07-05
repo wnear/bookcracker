@@ -8,10 +8,9 @@
 //NOTE:  implementation notes:
 //1. column 1 is word. use for wordlist of QListView.
 //1. column 2,3,4, for different usage, may contains:
-//   - word practice level => used in filter model to show/hide.
+//   - word visibility => simple filter.
 //   - word definition, show in widget.
 //   - word rect, used for annotation.
-
 
 class WordModel : public QAbstractItemModel {
     Q_OBJECT
@@ -24,7 +23,6 @@ class WordModel : public QAbstractItemModel {
         COLUMN_MEANING,
         COLUMN_PAGE,
         COLUMN_POS_IN_PAGE,
-        // COLUMN_INPAGE_IDX,
         COLUMN_END
     };
     WordModel(modeldata_t &document, QObject *parent = nullptr);
@@ -56,13 +54,11 @@ class WordSortFilterProxyModel : public QSortFilterProxyModel {
 
     void updateFilter();
     void setSearchPattern(const QString &ptn);
-    void setFilterCriteria();
 
   protected:
     bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override;
     bool lessThan(const QModelIndex &source_left,
                   const QModelIndex &source_right) const override;
-    // NOTE: usage, call this after any-word's known/indict/ignore status changed.
 
   private:
     QString m_match{};

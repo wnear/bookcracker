@@ -25,17 +25,6 @@ int WordModel::columnCount(const QModelIndex &parent) const {
 QVariant WordModel::data(const QModelIndex &index, int role) const {
     if (index.isValid()) {
         if (role == Qt::DisplayRole) {
-            /*
-                *
-    enum columnx{
-        COLUMN_WORD,
-        COLUMN_PRACTICE_LEVEL,
-        COLUMN_MEANING,
-        COLUMN_PAGE,
-        COLUMN_INPAGEX,
-        COLUMN_END
-    };
-            */
             auto data = m_data.value(m_data.keys()[index.row()]);
             switch (index.column()) {
                 case COLUMN_WORD: {
@@ -77,9 +66,9 @@ bool WordSortFilterProxyModel::filterAcceptsRow(int sourceRow,
                                                 const QModelIndex &sourceParent) const {
     // auto level_col = static_cast<int>(WordModel::COLUMN_PRACTICE_LEVEL);
     auto isVisible = sourceModel()
-                     ->index(sourceRow, WordModel::COLUMN_VISIBLE, sourceParent)
-                     .data()
-                     .toBool();
+                         ->index(sourceRow, WordModel::COLUMN_VISIBLE, sourceParent)
+                         .data()
+                         .toBool();
     // auto level = static_cast<wordlevel_t>(idx.data().toInt());
 
     bool res = isVisible;
@@ -95,10 +84,8 @@ bool WordSortFilterProxyModel::filterAcceptsRow(int sourceRow,
 }
 void WordSortFilterProxyModel::setSearchPattern(const QString &ptn) {
     m_match = ptn.toLower();
-    updateFilter();
+    invalidateFilter();
 }
-
-void WordSortFilterProxyModel::setFilterCriteria() { updateFilter(); }
 
 bool WordSortFilterProxyModel::lessThan(const QModelIndex &l,
                                         const QModelIndex &r) const {

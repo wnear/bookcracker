@@ -486,10 +486,9 @@ void Mainwindow::load_page(int n) {
     d->words_page_all = words_forCurPage();
     update_filter();
     load_page_after();
-    // TODO: necessary?
-    // maybe: the selection state.
+    // TODO: necessary? maybe for the selection state.
     d->wordlistview->reset();
-    d->proxyModel->sort(WordModel::COLUMN_WORD);
+    // d->proxyModel->sort(WordModel::COLUMN_WORD);
     d->proxyModel->sort(WordModel::COLUMN_POS_IN_PAGE);
 
     // d->wordlistview->
@@ -501,9 +500,8 @@ void Mainwindow::load_page(int n) {
         // demo code, highlight word test.
         auto myann = new Poppler::HighlightAnnotation;
         myann->setHighlightType(Poppler::HighlightAnnotation::Highlight);
-
         // myann->setBoundary(region);
-        //
+
         const QList<Poppler::HighlightAnnotation::Quad> quads = {
             {{{0, 0.1}, {0.2, 0.3}, {0.4, 0.5}, {0.6, 0.7}}, false, false, 0},
             // {{{0.8, 0.9}, {0.1, 0.2}, {0.3, 0.4}, {0.5, 0.6}}, true, false, 0.4}
@@ -786,11 +784,7 @@ void Mainwindow::display_outline() {
     }
 }
 Poppler::HighlightAnnotation *Mainwindow::make_highlight(QRectF region) {
-    // NOTE: from qpdfview.
     auto boundary = d->normalizedTransform.inverted().mapRect(region);
-    // qDebug() << __PRETTY_FUNCTION__;
-    // qDebug() << box;
-    // qDebug() << boundary;
     QList<Poppler::HighlightAnnotation::Quad> quads;
     {
         Poppler::HighlightAnnotation::Quad quad{{}, true, true, 0.1};

@@ -7,8 +7,8 @@
 
 using wordlevel_t = enum {
     LEVEL_UNKOWN,
-    WORD_IS_KNOW,
-    WORD_IS_LERNING,
+    WORD_IS_KNOWN,
+    WORD_IS_LEARNING,
     WORD_TOO_HARD,
     WORD_IS_IGNORED,
 };

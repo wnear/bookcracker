@@ -3,7 +3,8 @@
 using namespace std;
 
 QModelIndex WordModel::index(int row, int column, const QModelIndex &parent) const {
-    return (row >= 0 && row < this->rowCount()) ? createIndex(row, column, nullptr)
+    auto *item = &(m_data[m_data.keys()[row]]);
+    return (row >= 0 && row < this->rowCount()) ? createIndex(row, column, item)
                                                 : QModelIndex();
 }
 
@@ -51,7 +52,6 @@ QVariant WordModel::data(const QModelIndex &index, int role) const {
     return QVariant();
 }
 
-// Qt::ItemFlags WordModel::flags(const QModelIndex &index) const {}
 WordModel::WordModel(modeldata_t &document, QObject *parent)
     : QAbstractItemModel(parent), m_data(document) {}
 
@@ -59,12 +59,10 @@ void WordSortFilterProxyModel::updateFilter() { invalidateFilter(); }
 
 bool WordSortFilterProxyModel::filterAcceptsRow(int sourceRow,
                                                 const QModelIndex &sourceParent) const {
-    // auto level_col = static_cast<int>(WordModel::COLUMN_PRACTICE_LEVEL);
     auto isVisible = sourceModel()
                          ->index(sourceRow, WordModel::COLUMN_VISIBLE, sourceParent)
                          .data()
                          .toBool();
-    // auto level = static_cast<wordlevel_t>(idx.data().toInt());
 
     bool res = isVisible;
     if (!m_match.isEmpty()) {
@@ -92,7 +90,7 @@ bool WordSortFilterProxyModel::lessThan(const QModelIndex &l,
             return (cmp < 0);
         }
         case WordModel::COLUMN_POS_IN_PAGE:
-            return l.data().toInt() < r.data().toInt();
+            return l.data().toInt() > r.data().toInt();
     }
     return true;
 }

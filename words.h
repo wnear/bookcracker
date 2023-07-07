@@ -32,6 +32,20 @@ class Words {
         m_dict_list.erase(word);
         m_ignore_list.erase(word);
     }
+    //TODO:
+    void setWordWithLevel(const QString &word, wordlevel_t level) {
+        resetdict(word);
+        switch (level) {
+            case WORD_IS_KNOWN:
+                break;
+            case WORD_IS_LEARNING:
+                break;
+            case WORD_IS_IGNORED:
+                break;
+            default:
+                break;
+        }
+    }
 
     void addWordToKnown(const QString &word) {
         resetdict(word);

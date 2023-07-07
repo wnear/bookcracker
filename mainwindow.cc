@@ -193,45 +193,59 @@ Mainwindow::Mainwindow() {
                         d->sortorder = WordModel::COLUMN_WORD;
                         d->proxyModel->sort(d->sortorder);
                     });
-                    menu->addAction("knew", [this]() {
-                        // TODO: how to change internal data.
+                    auto sels = d->wordlistview->selectionModel()->selectedIndexes();
+                    if (!sels.isEmpty()) {
+                        menu->addSeparator();
+                        // sort indexes with  x.row() from big to small.
+                        std::sort(sels.begin(), sels.end(),
+                                  [](auto &&l, auto &&r) { return l.row() > r.row(); });
+                        menu->addAction("knew", [this, sels]() {
+                            for (auto idx : sels) {
+                                auto src_idx = d->proxyModel->mapToSource(idx);
+                                auto *ptr = src_idx.internalPointer();
+                                auto *item = static_cast<WordItem *>(ptr);
+                                item->wordlevel = WORD_IS_KNOWN;
+                                auto word = item->content;
+                                d->words_knew.insert(word);
+                                d->wordstore->addWordToKnown(word);
+                                d->proxyModel->updateFilter();
+                            }
+                        });
+                        menu->addAction("ignore", [this, sels]() {
+                            for (auto idx : sels) {
+                                auto src_idx = d->proxyModel->mapToSource(idx);
+                                auto *ptr = src_idx.internalPointer();
+                                auto *item = static_cast<WordItem *>(ptr);
+                                item->wordlevel = WORD_IS_IGNORED;
+                                auto word = item->content;
+                                d->words_ignore.insert(word);
+                                d->wordstore->addWordToIgnore(word);
+                                d->proxyModel->updateFilter();
+                            }
+                            // auto cur = d->listview.
+                            auto selectionmodel = d->wordlistview->selectionModel();
+                            for (auto idx : selectionmodel->selectedIndexes()) {
+                                auto data = d->model->itemData(idx);
+                                d->words_ignore.insert(data[0].toString());
+                                d->wordstore->addWordToIgnore(data[0].toString());
+                            }
+                            removeSeletedRowsFromView(d->wordlistview);
+                        });
+                        menu->addAction("add to dict", [this, sels]() {
+                            for (auto idx : sels) {
+                                auto src_idx = d->proxyModel->mapToSource(idx);
+                                auto *ptr = src_idx.internalPointer();
+                                auto *item = static_cast<WordItem *>(ptr);
+                                item->wordlevel = WORD_IS_LEARNING;
+                                auto word = item->content;
+                                d->words_ignore.insert(word);
+                                d->wordstore->addWordToIgnore(word);
+                                d->proxyModel->updateFilter();
+                            }
+                        });
+                    }
 
-                        //  auto cur = d->listview.
-                        auto sel_model = d->wordlistview->selectionModel();
-                        for (auto idx : sel_model->selectedIndexes()) {
-                            auto sourceIndex = d->proxyModel->mapToSource(idx);
-                            auto *item =
-                                static_cast<WordItem *>(sourceIndex.internalPointer());
-                            qDebug() << item->content;
-                            // sourceModel
-                            auto data = d->model->itemData(idx);
-                            d->words_knew.insert(data[0].toString());
-                            d->wordstore->addWordToKnown(data[0].toString());
-                        }
-                        removeSeletedRowsFromView(d->wordlistview);
-                    });
-                    menu->addAction("ignore", [this]() {
-                        // auto cur = d->listview.
-                        auto selectionmodel = d->wordlistview->selectionModel();
-                        for (auto idx : selectionmodel->selectedIndexes()) {
-                            auto data = d->model->itemData(idx);
-                            d->words_ignore.insert(data[0].toString());
-                            d->wordstore->addWordToIgnore(data[0].toString());
-                        }
-                        removeSeletedRowsFromView(d->wordlistview);
-                    });
-                    menu->addAction("add to dict", [this]() {
-                        // auto cur = d->listview.
-                        auto selectionmodel = d->wordlistview->selectionModel();
-                        for (auto idx : selectionmodel->selectedIndexes()) {
-                            auto data = d->model->itemData(idx);
-                            d->words_ignore.insert(data[0].toString());
-                            d->wordstore->addWordToIgnore(data[0].toString());
-                        }
-                        removeSeletedRowsFromView(d->wordlistview);
-                    });
-
-                    menu->exec(mapToGlobal(pos));
+                    menu->exec(mapToParent(pos));
                 });
     }
     // d->listwidget->setModelColumn
@@ -554,13 +568,13 @@ QStringList Mainwindow::do_filter(const QStringList &wordlist) {
         for (auto word : d->wordstruct_in_page.keys()) {
             // auto word = d->wordstruct_in_page[i].content;
             if (d->wordstore->isKnown(word)) {
-                d->wordstruct_in_page[word].wordlevel = WORD_IS_KNOW;
+                d->wordstruct_in_page[word].wordlevel = WORD_IS_KNOWN;
             }
             if (d->wordstore->isIgnored(word)) {
                 d->wordstruct_in_page[word].wordlevel = WORD_IS_IGNORED;
             }
             if (d->wordstore->isInDict(word)) {
-                d->wordstruct_in_page[word].wordlevel = WORD_IS_LERNING;
+                d->wordstruct_in_page[word].wordlevel = WORD_IS_LEARNING;
             }
             // d->wordstruct_in_page[word].isKnown = d->wordstore->isKnown(word);
             // d->wordstruct_in_page[word].isIgnored = d->wordstore->isIgnored(word);

@@ -105,6 +105,7 @@ class Mainwindow::Private {
     QStringListModel *model{nullptr};
     WordModel *sourceModel{nullptr};
     WordSortFilterProxyModel *proxyModel{nullptr};
+    WordModel::COLUMN_NO sortorder{WordModel::COLUMN_POS_IN_PAGE};
     QCheckBox *btn_showdict{nullptr};
     QCheckBox *btn_showConciseWordOnly{nullptr};
     QCheckBox *btn_showConciseOnly{nullptr};
@@ -184,10 +185,25 @@ Mainwindow::Mainwindow() {
                 [this](auto &&pos) {
                     auto menu = new QMenu;
                     menu->addAction("test");
+                    menu->addAction("sort by position", [this] {
+                        d->sortorder = WordModel::COLUMN_POS_IN_PAGE;
+                        d->proxyModel->sort(d->sortorder);
+                    });
+                    menu->addAction("sort by alphabeta", [this] {
+                        d->sortorder = WordModel::COLUMN_WORD;
+                        d->proxyModel->sort(d->sortorder);
+                    });
                     menu->addAction("knew", [this]() {
-                        // auto cur = d->listview.
+                        // TODO: how to change internal data.
+
+                        //  auto cur = d->listview.
                         auto sel_model = d->wordlistview->selectionModel();
                         for (auto idx : sel_model->selectedIndexes()) {
+                            auto sourceIndex = d->proxyModel->mapToSource(idx);
+                            auto *item =
+                                static_cast<WordItem *>(sourceIndex.internalPointer());
+                            qDebug() << item->content;
+                            // sourceModel
                             auto data = d->model->itemData(idx);
                             d->words_knew.insert(data[0].toString());
                             d->wordstore->addWordToKnown(data[0].toString());
@@ -489,7 +505,7 @@ void Mainwindow::load_page(int n) {
     // TODO: necessary? maybe for the selection state.
     d->wordlistview->reset();
     // d->proxyModel->sort(WordModel::COLUMN_WORD);
-    d->proxyModel->sort(WordModel::COLUMN_POS_IN_PAGE);
+    d->proxyModel->sort(d->sortorder);
 
     // d->wordlistview->
     //

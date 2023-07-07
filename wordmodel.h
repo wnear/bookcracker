@@ -5,19 +5,19 @@
 #include <QSortFilterProxyModel>
 #include <memory>
 
-//NOTE:  implementation notes:
-//1. column 1 is word. use for wordlist of QListView.
-//1. column 2,3,4, for different usage, may contains:
-//   - word visibility => simple filter.
-//   - word definition, show in widget.
-//   - word rect, used for annotation.
+// NOTE:  implementation notes:
+// 1. column 1 is word. use for wordlist of QListView.
+// 1. column 2,3,4, for different usage, may contains:
+//    - word visibility => simple filter.
+//    - word definition, show in widget.
+//    - word rect, used for annotation.
 
 class WordModel : public QAbstractItemModel {
     Q_OBJECT
 
   public:
     using modeldata_t = WordItemMap;
-    enum COLUMN_NO{
+    enum COLUMN_NO {
         COLUMN_WORD,
         COLUMN_VISIBLE,
         COLUMN_MEANING,
@@ -45,10 +45,9 @@ class WordModel : public QAbstractItemModel {
     modeldata_t &m_data;
 };
 
-// class WordModel
-//
 class WordSortFilterProxyModel : public QSortFilterProxyModel {
     Q_OBJECT
+
   public:
     WordSortFilterProxyModel(QObject *parent = nullptr) : QSortFilterProxyModel(parent) {}
 

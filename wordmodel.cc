@@ -57,11 +57,6 @@ WordModel::WordModel(modeldata_t &document, QObject *parent)
 
 void WordSortFilterProxyModel::updateFilter() { invalidateFilter(); }
 
-// bool WordSortFilterProxyModel::lessThan(const QModelIndex &source_left,
-//                                         const QModelIndex &source_right) const {
-//     return true;
-// }
-
 bool WordSortFilterProxyModel::filterAcceptsRow(int sourceRow,
                                                 const QModelIndex &sourceParent) const {
     // auto level_col = static_cast<int>(WordModel::COLUMN_PRACTICE_LEVEL);

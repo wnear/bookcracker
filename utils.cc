@@ -1,5 +1,7 @@
 #include "utils.h"
 
+#include <QStandardPaths>
+
 // used for,
 QStringList extendword(const QString& word) {
     QStringList res;
@@ -16,3 +18,14 @@ QStringList shortenword(const QString& word) {
     // v.
     return {};
 }
+
+QDir datadir() {
+    QString app_datapath =
+        QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+
+    auto data_dir = QDir(app_datapath);
+    if ( !data_dir.exists() )
+      data_dir.mkpath(".");
+    return data_dir;
+}
+

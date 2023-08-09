@@ -3,7 +3,8 @@
 using namespace std;
 
 QModelIndex WordModel::index(int row, int column, const QModelIndex &parent) const {
-    auto *item = &(m_data[m_data.keys()[row]]);
+    auto x = m_data->value(m_data->keys()[row]);
+    auto *item = &(x);
     return (row >= 0 && row < this->rowCount()) ? createIndex(row, column, item)
                                                 : QModelIndex();
 }
@@ -15,7 +16,7 @@ QModelIndex WordModel::parent(const QModelIndex &child) const {
 
 int WordModel::rowCount(const QModelIndex &parent) const {
     Q_UNUSED(parent);
-    return m_data.size();
+    return m_data->size();
 }
 
 int WordModel::columnCount(const QModelIndex &parent) const {
@@ -26,7 +27,7 @@ int WordModel::columnCount(const QModelIndex &parent) const {
 QVariant WordModel::data(const QModelIndex &index, int role) const {
     if (index.isValid()) {
         if (role == Qt::DisplayRole) {
-            auto data = m_data.value(m_data.keys()[index.row()]);
+            auto data = m_data->value(m_data->keys()[index.row()]);
             switch (index.column()) {
                 case COLUMN_WORD: {
                     return data.original;
@@ -52,7 +53,7 @@ QVariant WordModel::data(const QModelIndex &index, int role) const {
     return QVariant();
 }
 
-WordModel::WordModel(modeldata_t &document, QObject *parent)
+WordModel::WordModel(modeldata_t *document, QObject *parent)
     : QAbstractItemModel(parent), m_data(document) {}
 
 void WordSortFilterProxyModel::updateFilter() { invalidateFilter(); }

@@ -101,16 +101,18 @@ class Mainwindow::Private {
     QTextEdit *x{nullptr};
     QLabel *label{nullptr};
     // QListWidget *listwidget{nullptr};
+
     QListView *wordlistview{nullptr};
     QStringListModel *model{nullptr};
     WordModel *sourceModel{nullptr};
     WordSortFilterProxyModel *proxyModel{nullptr};
     WordModel::COLUMN_NO sortorder{WordModel::COLUMN_POS_IN_PAGE};
+
     QCheckBox *btn_showdict{nullptr};
     QCheckBox *btn_showConciseWordOnly{nullptr};
     QCheckBox *btn_showConciseOnly{nullptr};
-    QPushButton *btn_about;
     QPushButton *btn_scanscope;
+
 
     // beware, it's 1-idnexed.
     QLineEdit *edit_setPage{nullptr};
@@ -165,14 +167,14 @@ Mainwindow::Mainwindow() {
     auto splitter = new QSplitter(this);
     // d->listwidget = new QListWidget(this);
     d->wordstore = make_unique<TextSave>();
-    {
+    if(1){
         // TODO: about wordlist's view, two versions are needed.
         //  1. listview. fixed sort order, may configrued in setting,
         //  2. detail table view, with frequence, meaning, hardlevel,
         //
         d->wordlistview = new QListView(this);
         d->model = new QStringListModel();
-        d->sourceModel = new WordModel(d->wordstruct_in_page, this);
+        d->sourceModel = new WordModel(&d->wordstruct_in_page, this);
         d->proxyModel = new WordSortFilterProxyModel(this);
         d->proxyModel->setSourceModel(d->sourceModel);
         // d->proxyModel->setSourceModel(d->model);
@@ -276,14 +278,6 @@ Mainwindow::Mainwindow() {
                 this->d->scopeIsPage = !this->d->scopeIsPage;
                 update_filter();
             });
-        }
-        if (0) {
-            // NOTE: replace with concise mode btn...
-            d->btn_showConciseOnly = new QCheckBox("Show word with captical word");
-            d->btn_showConciseOnly->setChecked(true);
-            lay->addWidget(d->btn_showConciseOnly);
-            connect(d->btn_showConciseOnly, &QAbstractButton::clicked, this,
-                    &Mainwindow::update_filter);
         }
         lay->addWidget(d->wordlistview);
     }
@@ -486,8 +480,11 @@ void Mainwindow::load_page_before() {
     d->sourceModel->reset_data_before();
     d->wordstruct_in_page.clear();
 }
+
 void Mainwindow::load_page_after() {
     // cout << "now have word: " << d->wordstruct_in_page.size()<<endl;
+    d->words_page_all = words_forCurPage();
+    update_filter();
     d->sourceModel->reset_data_after();
     for (auto i : d->wordstruct_in_page.keys()) {
         auto &hl = d->wordstruct_in_page[i].highlight;
@@ -498,11 +495,20 @@ void Mainwindow::load_page_after() {
             }
         }
     }
+    // TODO: necessary? maybe for the selection state.
+    d->wordlistview->reset();
+    // d->proxyModel->sort(WordModel::COLUMN_WORD);
+    d->proxyModel->sort(d->sortorder);
+    update_image();
 }
+
 void Mainwindow::load_page(int n) {
     assert(d->pageno != n);
+
+    //1. before swtich page, release load for current page.
     load_page_before();
 
+    //2. load new page, directly from the qpoppler, draw it for display.
     d->pageno = n;
     d->edit_setPage->setText(QString("%1").arg(d->pageno + 1));
     // d->pdfpage = d->document->page(d->pageno);
@@ -513,32 +519,11 @@ void Mainwindow::load_page(int n) {
 
     cout << "load page:" << n << endl;
 
-    d->words_page_all = words_forCurPage();
-    update_filter();
-    load_page_after();
-    // TODO: necessary? maybe for the selection state.
-    d->wordlistview->reset();
-    // d->proxyModel->sort(WordModel::COLUMN_WORD);
-    d->proxyModel->sort(d->sortorder);
-
-    // d->wordlistview->
-    //
-    // d->words_page_afterFilter = do_filter(d->words_page_all);
-    // d->model->setStringList(d->words_page_afterFilter);
-
-    if (0) {
-        // demo code, highlight word test.
-        auto myann = new Poppler::HighlightAnnotation;
-        myann->setHighlightType(Poppler::HighlightAnnotation::Highlight);
-        // myann->setBoundary(region);
-
-        const QList<Poppler::HighlightAnnotation::Quad> quads = {
-            {{{0, 0.1}, {0.2, 0.3}, {0.4, 0.5}, {0.6, 0.7}}, false, false, 0},
-            // {{{0.8, 0.9}, {0.1, 0.2}, {0.3, 0.4}, {0.5, 0.6}}, true, false, 0.4}
-        };
-        myann->setHighlightQuads(quads);
-    }
     update_image();
+
+    //3. do heavy job after the load.
+    //calcualte the words after filter, and redraw.
+    load_page_after();
 }
 #endif
 

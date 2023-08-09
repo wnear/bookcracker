@@ -25,7 +25,7 @@ class WordModel : public QAbstractItemModel {
         COLUMN_POS_IN_PAGE,
         COLUMN_END
     };
-    WordModel(modeldata_t &document, QObject *parent = nullptr);
+    WordModel(modeldata_t *document, QObject *parent = nullptr);
     ~WordModel() = default;
 
     QVariant data(const QModelIndex &index, int role) const override;
@@ -42,7 +42,7 @@ class WordModel : public QAbstractItemModel {
 
   private:
     void setupModelData();
-    modeldata_t &m_data;
+    modeldata_t *m_data;
 };
 
 class WordSortFilterProxyModel : public QSortFilterProxyModel {
@@ -67,7 +67,7 @@ class WordSortFilterProxyModel : public QSortFilterProxyModel {
 class WordListModel : public QAbstractListModel {
   public:
     using modeldata_t = WordItemMap;
-    WordListModel(modeldata_t &data, QObject *parent = nullptr)
+    WordListModel(modeldata_t *data, QObject *parent = nullptr)
         : QAbstractListModel(parent), m_data(data){};
 
     QVariant data(const QModelIndex &index, int role) const override {
@@ -83,9 +83,9 @@ class WordListModel : public QAbstractListModel {
         return {};
     }
     int rowCount(const QModelIndex &parent = QModelIndex()) const override {
-        return parent.isValid() ? 0 : m_data.size();
+        return parent.isValid() ? 0 : m_data->size();
     }
 
   private:
-    const modeldata_t &m_data;
+    const modeldata_t *m_data;
 };

@@ -1,5 +1,6 @@
 #include "wordmodel.h"
 #include <iostream>
+#include <QDebug>
 using namespace std;
 
 QModelIndex WordModel::index(int row, int column, const QModelIndex &parent) const {
@@ -16,7 +17,10 @@ QModelIndex WordModel::parent(const QModelIndex &child) const {
 
 int WordModel::rowCount(const QModelIndex &parent) const {
     Q_UNUSED(parent);
-    return m_data->size();
+    if (m_data == nullptr)
+        return 0;
+    else
+        return m_data->size();
 }
 
 int WordModel::columnCount(const QModelIndex &parent) const {
@@ -53,8 +57,9 @@ QVariant WordModel::data(const QModelIndex &index, int role) const {
     return QVariant();
 }
 
-WordModel::WordModel(modeldata_t *document, QObject *parent)
-    : QAbstractItemModel(parent), m_data(document) {}
+WordModel::WordModel(QObject *parent) : QAbstractItemModel(parent) {}
+
+void WordModel::setupModelData(modeldata_t *document) { m_data = document; }
 
 void WordSortFilterProxyModel::updateFilter() { invalidateFilter(); }
 

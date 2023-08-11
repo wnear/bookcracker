@@ -11,6 +11,7 @@
 #include <QStringListModel>
 #include <QLabel>
 #include <QFileInfo>
+#include <QDebug>
 #include <QPushButton>
 #include <QStringListModel>
 #include "wordmodel.h"
@@ -71,12 +72,12 @@ WordlistWidget::WordlistWidget(QWidget *parent) : QWidget(parent) {
             connect(d->btn_scanscope, &QPushButton::clicked, this,
                     &WordlistWidget::updateFilter);
         }
+        d->wordlistview = new QListView(this);
         lay->addWidget(d->wordlistview);
     }
 
     // data.
 
-    d->wordlistview = new QListView(this);
     d->sourceModel = new WordModel(nullptr);
     d->proxyModel = new WordSortFilterProxyModel(this);
     d->proxyModel->setSourceModel(d->sourceModel);
@@ -84,6 +85,10 @@ WordlistWidget::WordlistWidget(QWidget *parent) : QWidget(parent) {
     d->wordlistview->setModel(d->proxyModel);
     d->wordlistview->setSelectionMode(QAbstractItemView::ExtendedSelection);
     d->wordlistview->setContextMenuPolicy(Qt::CustomContextMenu);
+}
+void WordlistWidget::setupModel(WordItemMap *data) {
+    qDebug()<<__PRETTY_FUNCTION__;
+    d->sourceModel->setupModelData(data);
 }
 
 bool WordlistWidget::showx() { return d->btn_showdict->isChecked(); };
@@ -145,3 +150,13 @@ void WordlistWidget::contextMenuEvent(QContextMenuEvent *evt) {
 }
 // auto pos =
 void WordlistWidget::setWords(const QStringList &words) {}
+void WordlistWidget::onPageLoadBefore() {
+    d->sourceModel->reset_data_before();
+}
+
+void WordlistWidget::onPageLoadAfter() {
+    d->sourceModel->reset_data_after();
+    d->wordlistview->reset();
+    d->proxyModel->sort(d->sortorder);
+}
+

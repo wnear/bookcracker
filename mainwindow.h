@@ -20,6 +20,7 @@ struct Section {
 };
 
 class Mainwindow : public QMainWindow {
+    Q_OBJECT
   public:
     enum WordType { KNEW, DICT, IGNORED, NEW };
     Mainwindow();
@@ -28,6 +29,10 @@ class Mainwindow : public QMainWindow {
     void setupBtns();
 
     void openFile(const QString &filename);
+
+  signals:
+    void pageLoadBefore();
+    void PageLoadDone();
 
   private:
     void load_settings();

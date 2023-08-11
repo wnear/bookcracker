@@ -3,6 +3,7 @@
 #include "worditem.h"
 #include "wordmodel.h"
 #include "settings.h"
+#include "wordlistwidget.h"
 // #include <poppler-qt6.h>
 #include <iostream>
 #include <algorithm>
@@ -102,6 +103,7 @@ class Mainwindow::Private {
     QLabel *label{nullptr};
     // QListWidget *listwidget{nullptr};
 
+    WordlistWidget *wordwgt{nullptr};
     QListView *wordlistview{nullptr};
     WordModel *sourceModel{nullptr};
     WordSortFilterProxyModel *proxyModel{nullptr};
@@ -166,13 +168,14 @@ Mainwindow::Mainwindow() {
     auto splitter = new QSplitter(this);
     // d->listwidget = new QListWidget(this);
     d->wordstore = make_unique<TextSave>();
-    if(1){
+    if(0){
         // TODO: about wordlist's view, two versions are needed.
         //  1. listview. fixed sort order, may configrued in setting,
         //  2. detail table view, with frequence, meaning, hardlevel,
         //
         d->wordlistview = new QListView(this);
-        d->sourceModel = new WordModel(&d->wordstruct_in_page, this);
+        d->sourceModel = new WordModel( this);
+        d->sourceModel->setupModelData(&d->wordstruct_in_page);
         d->proxyModel = new WordSortFilterProxyModel(this);
         d->proxyModel->setSourceModel(d->sourceModel);
 
@@ -251,7 +254,11 @@ Mainwindow::Mainwindow() {
     }
     // d->listwidget->setModelColumn
     auto wordwgt = new QWidget;
-    {
+    d->wordwgt = new WordlistWidget(this);
+    d->wordwgt->setupModel(&d->wordstruct_in_page);
+    connect(this, &Mainwindow::pageLoadBefore, d->wordwgt, &WordlistWidget::onPageLoadBefore);
+    connect(this, &Mainwindow::PageLoadDone, d->wordwgt, &WordlistWidget::onPageLoadAfter);
+   if(0) {
         auto lay = new QVBoxLayout;
         wordwgt->setLayout(lay);
         {
@@ -289,7 +296,7 @@ Mainwindow::Mainwindow() {
 
     pageShower->setLayout(pageLay);
 
-    splitter->addWidget(wordwgt);
+    splitter->addWidget(d->wordwgt);
     splitter->addWidget(pageShower);
 
     {
@@ -302,7 +309,7 @@ Mainwindow::Mainwindow() {
         toolbar_lay->addWidget(btn_showoutline);
         connect(btn_showoutline, &QAbstractButton::clicked, this, [=]() {
             // wordwgt->isHidden();
-            wordwgt->setHidden(!wordwgt->isHidden());
+            d->wordwgt->setHidden(!d->wordwgt->isHidden());
         });
         d->edit_setPage = new QLineEdit(this);
         d->edit_setPage->setFixedWidth(100);
@@ -475,7 +482,8 @@ void Mainwindow::load_page_before() {
             }
         }
     }
-    d->sourceModel->reset_data_before();
+    // d->sourceModel->reset_data_before();
+    emit pageLoadBefore();
     d->wordstruct_in_page.clear();
 }
 
@@ -483,7 +491,7 @@ void Mainwindow::load_page_after() {
     // cout << "now have word: " << d->wordstruct_in_page.size()<<endl;
     d->words_page_all = words_forCurPage();
     update_filter();
-    d->sourceModel->reset_data_after();
+    // d->sourceModel->reset_data_after();
     for (auto i : d->wordstruct_in_page.keys()) {
         auto &hl = d->wordstruct_in_page[i].highlight;
         auto is_visible = d->wordstruct_in_page[i].isVisible();
@@ -494,9 +502,10 @@ void Mainwindow::load_page_after() {
         }
     }
     // TODO: necessary? maybe for the selection state.
-    d->wordlistview->reset();
+    // d->wordlistview->reset();
     // d->proxyModel->sort(WordModel::COLUMN_WORD);
-    d->proxyModel->sort(d->sortorder);
+    // d->proxyModel->sort(d->sortorder);
+    emit PageLoadDone();
     update_image();
 }
 

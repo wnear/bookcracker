@@ -25,7 +25,8 @@ class WordModel : public QAbstractItemModel {
         COLUMN_POS_IN_PAGE,
         COLUMN_END
     };
-    WordModel(modeldata_t *document, QObject *parent = nullptr);
+    WordModel( QObject *parent = nullptr);
+    void setupModelData(modeldata_t *document);
     ~WordModel() = default;
 
     QVariant data(const QModelIndex &index, int role) const override;
@@ -41,7 +42,6 @@ class WordModel : public QAbstractItemModel {
     // Qt::ItemFlags flags(const QModelIndex &index) const override;
 
   private:
-    void setupModelData();
     modeldata_t *m_data;
 };
 

@@ -77,11 +77,9 @@ WordlistWidget::WordlistWidget(QWidget *parent) : QWidget(parent) {
     // data.
 
     d->wordlistview = new QListView(this);
-    d->model = new QStringListModel();
     d->sourceModel = new WordModel(nullptr);
     d->proxyModel = new WordSortFilterProxyModel(this);
     d->proxyModel->setSourceModel(d->sourceModel);
-    // d->proxyModel->setSourceModel(d->model);
 
     d->wordlistview->setModel(d->proxyModel);
     d->wordlistview->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -128,7 +126,7 @@ void WordlistWidget::contextMenuEvent(QContextMenuEvent *evt) {
             // auto cur = d->listview.
             auto selectionmodel = d->wordlistview->selectionModel();
             for (auto idx : selectionmodel->selectedIndexes()) {
-                auto data = d->model->itemData(idx);
+                auto data = d->wordlistview->model()->itemData(idx);
             }
             removeSeletedRowsFromView(d->wordlistview);
         });

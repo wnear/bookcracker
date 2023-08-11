@@ -103,7 +103,6 @@ class Mainwindow::Private {
     // QListWidget *listwidget{nullptr};
 
     QListView *wordlistview{nullptr};
-    QStringListModel *model{nullptr};
     WordModel *sourceModel{nullptr};
     WordSortFilterProxyModel *proxyModel{nullptr};
     WordModel::COLUMN_NO sortorder{WordModel::COLUMN_POS_IN_PAGE};
@@ -173,11 +172,9 @@ Mainwindow::Mainwindow() {
         //  2. detail table view, with frequence, meaning, hardlevel,
         //
         d->wordlistview = new QListView(this);
-        d->model = new QStringListModel();
         d->sourceModel = new WordModel(&d->wordstruct_in_page, this);
         d->proxyModel = new WordSortFilterProxyModel(this);
         d->proxyModel->setSourceModel(d->sourceModel);
-        // d->proxyModel->setSourceModel(d->model);
 
         d->wordlistview->setModel(d->proxyModel);
         d->wordlistview->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -211,6 +208,7 @@ Mainwindow::Mainwindow() {
                                 d->words_knew.insert(word);
                                 d->wordstore->addWordToKnown(word);
                                 d->proxyModel->updateFilter();
+                                qDebug()<<QString("mark %1 as knew.").arg(word);
                             }
                         });
                         menu->addAction("ignore", [this, sels]() {
@@ -223,11 +221,12 @@ Mainwindow::Mainwindow() {
                                 d->words_ignore.insert(word);
                                 d->wordstore->addWordToIgnore(word);
                                 d->proxyModel->updateFilter();
+                                qDebug()<<QString("mark %1 as ignore.").arg(word);
                             }
                             // auto cur = d->listview.
                             auto selectionmodel = d->wordlistview->selectionModel();
                             for (auto idx : selectionmodel->selectedIndexes()) {
-                                auto data = d->model->itemData(idx);
+                                auto data = d->wordlistview->model()->itemData(idx);
                                 d->words_ignore.insert(data[0].toString());
                                 d->wordstore->addWordToIgnore(data[0].toString());
                             }
@@ -412,7 +411,6 @@ void Mainwindow::load_page(int n) {
     update_filter();
     // d->words_page_afterFilter = do_filter(d->words_page_all);
 
-    d->model->setStringList(d->words_page_afterFilter);
 
     // highlight word.
     auto myann = new Poppler::HighlightAnnotation;
@@ -590,10 +588,8 @@ QStringList Mainwindow::do_filter(const QStringList &wordlist) {
 void Mainwindow::update_filter() {
     if (d->scopeIsPage) {
         d->words_page_afterFilter = do_filter(d->words_page_all);
-        d->model->setStringList(d->words_page_afterFilter);
     } else {
         d->words_docu_afterFilter = do_filter(d->words_docu_all);
-        d->model->setStringList(d->words_docu_afterFilter);
     }
 }
 

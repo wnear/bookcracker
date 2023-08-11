@@ -92,6 +92,9 @@ void SQLManager::import_txt_with_level(const QString &filename, wordlevel_t lv) 
         this->addword(line, lv);
     }
 }
+void SQLManager::export_level_to_text(wordlevel_t lv, const QString &filename) {
+
+}
 
 bool SQLManager::addword(const QString &word, wordlevel_t lv) {
     QSqlQuery q;
@@ -111,6 +114,20 @@ bool SQLManager::addword(const QString &word, wordlevel_t lv) {
     return ok;
 }
 
+// UPDATE COMPANY SET ADDRESS = 'Texas' WHERE ID = 6
+bool SQLManager::updateword(const QString &word, wordlevel_t lv) {
+    QSqlQuery q;
+    QString cmdstr =
+        QString("update word_info set proficiency = %1 where word=\"%2\"").arg(static_cast<int>(lv)).arg(word);
+    q.prepare(cmdstr);
+
+    auto ok = q.exec();
+    checkReturn(ok, q, "add word");
+    if(not ok)
+        assert(0);
+    return ok;
+
+}
 wordlevel_t SQLManager::findword(const QString &word) {
     QSqlQuery q;
     QString cmdstr =
@@ -138,3 +155,5 @@ void SQLManager::checkReturn(bool ok, QSqlQuery &q, const QString &msg, int line
         logSqlError(q.lastError());
     }
 }
+
+

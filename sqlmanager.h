@@ -22,18 +22,25 @@ class SQLManager {
     void init_id();
 
     void import_txt_with_level(const QString &filename, wordlevel_t lv);
+    void export_level_to_text(wordlevel_t lv, const QString &filename);
 
     void close() { m_sqldb.close(); }
     bool runScript(QString fileName);
     bool runScript(QFile *file, QSqlQuery *query);
 
-    bool addword(const QString &word, wordlevel_t lv);
+
+
+    // word and wordlevel_t
     wordlevel_t findword(const QString &word);
-    void addword(const QString &word , WordItem *lv);
-    void updateword(const QString &word, WordItem *lv);
-    void updateword(const QString &word, wordlevel_t old_level, wordlevel_t new_level);
+    bool addword(const QString &word, wordlevel_t lv);
+    bool updateword(const QString &word, wordlevel_t new_level);
 
-
+    bool addword(const QString &word , WordItem *lv){
+        return true;
+    }
+    bool updateword(const QString &word, WordItem *lv){
+        return true;
+    }
 
     bool logSqlError(QSqlError error, bool fatal = false);
     void checkReturn(bool ok, QSqlQuery &q, const QString &msg = "", int line = -1);

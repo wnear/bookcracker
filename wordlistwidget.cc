@@ -85,6 +85,7 @@ WordlistWidget::WordlistWidget(QWidget *parent) : QWidget(parent) {
     d->wordlistview->setModel(d->proxyModel);
     d->wordlistview->setSelectionMode(QAbstractItemView::ExtendedSelection);
     d->wordlistview->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(d->wordlistview, &QWidget::customContextMenuRequested, this, &WordlistWidget::onListViewContextMenu);
 }
 void WordlistWidget::setupModel(WordItemMap *data) {
     qDebug()<<__PRETTY_FUNCTION__;
@@ -92,7 +93,7 @@ void WordlistWidget::setupModel(WordItemMap *data) {
 }
 
 bool WordlistWidget::showx() { return d->btn_showdict->isChecked(); };
-void WordlistWidget::contextMenuEvent(QContextMenuEvent *evt) {
+void WordlistWidget::onListViewContextMenu(const QPoint &pos) {
     auto menu = new QMenu;
     menu->addAction("test");
     menu->addAction("sort by position", [this] {
@@ -146,7 +147,7 @@ void WordlistWidget::contextMenuEvent(QContextMenuEvent *evt) {
             }
         });
     }
-    menu->exec(evt->globalPos());
+    menu->exec(mapToGlobal(pos));
 }
 // auto pos =
 void WordlistWidget::setWords(const QStringList &words) {}

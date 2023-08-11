@@ -13,9 +13,9 @@ class WordlistWidget : public QWidget {
   public slots:
     void onPageLoadBefore();
     void onPageLoadAfter();
+    void onListViewContextMenu(const QPoint &pos);
 
   protected:
-    void contextMenuEvent(QContextMenuEvent *event) override;
 
   private:
     struct PrivateData *d;

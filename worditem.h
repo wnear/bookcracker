@@ -5,7 +5,7 @@
 #include <QVector>
 #include <poppler-annotation.h>
 
-using wordlevel_t = enum {
+enum wordlevel_t{
     LEVEL_UNKOWN,
     WORD_IS_KNOWN,
     WORD_IS_LEARNING,

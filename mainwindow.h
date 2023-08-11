@@ -59,7 +59,7 @@ class Mainwindow : public QMainWindow {
 
     bool shouldShowWordType(WordType wt) const;
 
-    QStringList do_filter(const QStringList &cur);
+    QStringList check_wordlevel(const QStringList &cur);
     QStringList words_forCurPage();
     QStringList words_forDocument();
     // QStringList scavenge_impl(){}

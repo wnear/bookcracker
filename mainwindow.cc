@@ -137,7 +137,7 @@ class Mainwindow::Private {
     //     Poppler::Document *document{nullptr};
     // #endif
 
-    std::unique_ptr<TextSave> wordstore{nullptr};
+    std::unique_ptr<SqlSave> wordstore{nullptr};
     // data, should be consistent.
 
     QStringList words_page_all;          // all words in current page.
@@ -162,7 +162,7 @@ Mainwindow::Mainwindow() {
 
     auto splitter = new QSplitter(this);
     // d->listwidget = new QListWidget(this);
-    d->wordstore = make_unique<TextSave>();
+    d->wordstore = make_unique<SqlSave>();
     if (0) {
         // TODO: about wordlist's view, two versions are needed.
         //  1. listview. fixed sort order, may configrued in setting,

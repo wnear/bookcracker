@@ -156,4 +156,12 @@ void SQLManager::checkReturn(bool ok, QSqlQuery &q, const QString &msg, int line
     }
 }
 
+void SQLManager::getwords(QMap<QString, wordlevel_t> &res) {
+    QSqlQuery q("SELECT word, proficiency from word_info");
+    while(q.next()){
+        auto word = q.value(0).toString();
+        auto lv = q.value(1).toInt();
+        res.insert(word, static_cast<wordlevel_t>(lv));
+    }
+}
 

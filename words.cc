@@ -1,6 +1,7 @@
 
 #include "words.h"
 #include <QStandardPaths>
+#include <QDebug>
 #include <fstream>
 #include <iostream>
 
@@ -140,5 +141,12 @@ bool Words::isIgnored(const QString& word) {
 
 bool Words::isInDict(const QString& word) { return searchword(m_dict_list, word); }
 
-void SqlSave::save() {}
-void SqlSave::load() {}
+SqlSave::SqlSave() :Words(){
+    this->load();
+}
+void SqlSave::load() {
+    qDebug()<<"begin loading";
+    SQLManager::instance()->getwords(m_all_list);
+    qDebug()<<"loading done: " << m_all_list.size();
+}
+

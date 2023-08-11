@@ -47,9 +47,9 @@ WordlistWidget::WordlistWidget(QWidget *parent) : QWidget(parent) {
     d = new PrivateData;
     auto wordwgt = this;
     // layout.
+    auto lay = new QVBoxLayout;
+    wordwgt->setLayout(lay);
     {
-        auto lay = new QVBoxLayout;
-        wordwgt->setLayout(lay);
         {
             d->btn_showdict = new QCheckBox("Show word in dict", this);
             lay->addWidget(d->btn_showdict);
@@ -72,9 +72,9 @@ WordlistWidget::WordlistWidget(QWidget *parent) : QWidget(parent) {
             connect(d->btn_scanscope, &QPushButton::clicked, this,
                     &WordlistWidget::updateFilter);
         }
-        d->wordlistview = new QListView(this);
-        lay->addWidget(d->wordlistview);
     }
+    d->wordlistview = new QListView(this);
+    lay->addWidget(d->wordlistview);
 
     // data.
 
@@ -85,10 +85,14 @@ WordlistWidget::WordlistWidget(QWidget *parent) : QWidget(parent) {
     d->wordlistview->setModel(d->proxyModel);
     d->wordlistview->setSelectionMode(QAbstractItemView::ExtendedSelection);
     d->wordlistview->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(d->wordlistview, &QWidget::customContextMenuRequested, this, &WordlistWidget::onListViewContextMenu);
+    connect(d->wordlistview, &QWidget::customContextMenuRequested, this,
+            &WordlistWidget::onListViewContextMenu);
 }
 void WordlistWidget::setupModel(WordItemMap *data) {
-    qDebug()<<__PRETTY_FUNCTION__;
+    qDebug() << __PRETTY_FUNCTION__;
+    if (d->sourceModel == nullptr) {
+        return;
+    }
     d->sourceModel->setupModelData(data);
 }
 
@@ -151,13 +155,10 @@ void WordlistWidget::onListViewContextMenu(const QPoint &pos) {
 }
 // auto pos =
 void WordlistWidget::setWords(const QStringList &words) {}
-void WordlistWidget::onPageLoadBefore() {
-    d->sourceModel->reset_data_before();
-}
+void WordlistWidget::onPageLoadBefore() { d->sourceModel->reset_data_before(); }
 
 void WordlistWidget::onPageLoadAfter() {
     d->sourceModel->reset_data_after();
     d->wordlistview->reset();
     d->proxyModel->sort(d->sortorder);
 }
-

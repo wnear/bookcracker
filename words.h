@@ -6,7 +6,6 @@
 #include <QMap>
 #include <unordered_map>
 
-
 // NOTE: words is designed as two layer-ed, in memory and in-disk persistance.
 class Words {
   protected:
@@ -36,15 +35,14 @@ class Words {
 
     bool isInDict(const QString &word);
 
-
     void resetdict(const QString &word) {
         m_ignore_list.erase(word);
         m_dict_list.erase(word);
         m_ignore_list.erase(word);
     }
-    // TODO:
-    wordlevel_t getWordLevel(const QString &word){
-        return LEVEL_UNKOWN;
+
+    wordlevel_t getWordLevel(const QString &word) {
+        return m_all_list.value(word, LEVEL_UNKOWN);
     }
     void setWordWithLevel(const QString &word, wordlevel_t level) {
         resetdict(word);
@@ -60,7 +58,8 @@ class Words {
         }
     }
 
-    virtual void updateWord(const QString &word, wordlevel_t old_level, wordlevel_t new_level) {
+    virtual void updateWord(const QString &word, wordlevel_t old_level,
+                            wordlevel_t new_level) {
         m_dicts[new_level]->insert(word);
         if (old_level != LEVEL_UNKOWN) m_dicts[old_level]->erase(word);
     }
@@ -85,18 +84,20 @@ class TextSave : public Words {
 class SqlSave : public Words {
   public:
     SqlSave();
-    virtual ~SqlSave();
-    virtual void updateWord(const QString &word, wordlevel_t old_level, wordlevel_t new_level) override{
+    virtual ~SqlSave() {}
+    virtual void updateWord(const QString &word, wordlevel_t old_level,
+                            wordlevel_t new_level) override {
         Words::updateWord(word, old_level, new_level);
-        if(old_level == LEVEL_UNKOWN){
-            //add
+        if (old_level == LEVEL_UNKOWN) {
+            // add
             SQLManager::instance()->addword(word, new_level);
         } else {
-            //update.
+            // update.
             SQLManager::instance()->updateword(word, new_level);
         }
     }
-    virtual void save() override;
+    virtual void save() override {}
     virtual void load() override;
 };
+
 class Leveldb : public Words {};

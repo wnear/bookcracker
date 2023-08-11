@@ -32,6 +32,7 @@ class SQLManager {
 
     // word and wordlevel_t
     wordlevel_t findword(const QString &word);
+    void getwords(QMap<QString, wordlevel_t> &res);
     bool addword(const QString &word, wordlevel_t lv);
     bool updateword(const QString &word, wordlevel_t new_level);
 

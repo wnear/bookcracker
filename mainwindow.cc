@@ -140,8 +140,6 @@ class Mainwindow::Private {
 
     std::unique_ptr<TextSave> wordstore{nullptr};
     // data, should be consistent.
-    QSet<QString> words_knew;
-    QSet<QString> words_ignore;
 
     QStringList words_page_all;          // all words in current page.
     QStringList words_page_afterFilter;  // after filter.
@@ -208,7 +206,6 @@ Mainwindow::Mainwindow() {
                                 auto *item = static_cast<WordItem *>(ptr);
                                 item->wordlevel = WORD_IS_KNOWN;
                                 auto word = item->content;
-                                d->words_knew.insert(word);
                                 d->wordstore->addWordToKnown(word);
                                 d->proxyModel->updateFilter();
                                 qDebug()<<QString("mark %1 as knew.").arg(word);
@@ -221,7 +218,6 @@ Mainwindow::Mainwindow() {
                                 auto *item = static_cast<WordItem *>(ptr);
                                 item->wordlevel = WORD_IS_IGNORED;
                                 auto word = item->content;
-                                d->words_ignore.insert(word);
                                 d->wordstore->addWordToIgnore(word);
                                 d->proxyModel->updateFilter();
                                 qDebug()<<QString("mark %1 as ignore.").arg(word);
@@ -230,7 +226,6 @@ Mainwindow::Mainwindow() {
                             auto selectionmodel = d->wordlistview->selectionModel();
                             for (auto idx : selectionmodel->selectedIndexes()) {
                                 auto data = d->wordlistview->model()->itemData(idx);
-                                d->words_ignore.insert(data[0].toString());
                                 d->wordstore->addWordToIgnore(data[0].toString());
                             }
                             removeSeletedRowsFromView(d->wordlistview);
@@ -242,7 +237,6 @@ Mainwindow::Mainwindow() {
                                 auto *item = static_cast<WordItem *>(ptr);
                                 item->wordlevel = WORD_IS_LEARNING;
                                 auto word = item->content;
-                                d->words_ignore.insert(word);
                                 d->wordstore->addWordToIgnore(word);
                                 d->proxyModel->updateFilter();
                             }

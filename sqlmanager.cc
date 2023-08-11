@@ -7,8 +7,7 @@
 #include <QSqlError>
 
 SQLManager::SQLManager() {
-    // QString m_location = util::datadir().absoluteFilePath("localpod.sqlite3");
-    auto m_location = "a.sqlite3";
+    QString m_location = datadir().absoluteFilePath("words.sqlite3");
 
     // Open the database connection
     m_sqldb = QSqlDatabase::addDatabase("QSQLITE");
@@ -24,10 +23,11 @@ void SQLManager::init() {
     // Create any tables that are non-existent.
     runScript(":sql/create.sql");
     init_id();
+    // import_txt_with_level(datadir().absoluteFilePath("plain_known.txt"), WORD_IS_KNOWN);
+    // import_txt_with_level(datadir().absoluteFilePath("plain_ignore.txt"), WORD_IS_IGNORED);
 }
 
-void SQLManager::init_id() {
-}
+void SQLManager::init_id() {}
 
 bool SQLManager::runScript(QString fileName) {
     QFile file(fileName);
@@ -78,4 +78,63 @@ bool SQLManager::logSqlError(QSqlError error, bool fatal) {
         qWarning("%s", msg.toLatin1().constData());
 
     return false;
+}
+
+void SQLManager::import_txt_with_level(const QString &filename, wordlevel_t lv) {
+    QFile f(filename);
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning("file read error.");
+        return;
+    }
+    QTextStream in(&f);
+    while (!in.atEnd()) {
+        QString line = in.readLine();
+        this->addword(line, lv);
+    }
+}
+
+bool SQLManager::addword(const QString &word, wordlevel_t lv) {
+    QSqlQuery q;
+    QString cmdstr =
+        QString("INSERT INTO word_info (word, proficiency) VALUES (%1, %2)")
+            .arg(":word")
+            .arg(":proficiency");
+    q.prepare(cmdstr);
+
+    q.bindValue(":word", word);
+    q.bindValue(":proficiency", static_cast<int>(lv));
+
+    auto ok = q.exec();
+    checkReturn(ok, q, "add word");
+    if(not ok)
+        assert(0);
+    return ok;
+}
+
+wordlevel_t SQLManager::findword(const QString &word) {
+    QSqlQuery q;
+    QString cmdstr =
+        QString("select proficiency from word_info where word = \"%1\"").arg(1);
+    q.prepare(cmdstr);
+
+    auto ok = q.exec();
+    checkReturn(ok, q, "find word");
+    if(!ok){
+        assert(0);
+    }
+    if(q.next()){
+        auto val = q.value("proficiency").toInt();
+        return static_cast<wordlevel_t>(val);
+    }
+    return LEVEL_UNKOWN;
+}
+
+void SQLManager::checkReturn(bool ok, QSqlQuery &q, const QString &msg, int line) {
+    if (not ok) {
+        if (line == -1)
+            qDebug() << QString("[sql error]: %1").arg(msg);
+        else
+            qDebug() << QString("[sql error at L%1]: %2").arg(line).arg(msg);
+        logSqlError(q.lastError());
+    }
 }

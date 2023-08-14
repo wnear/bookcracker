@@ -2,22 +2,8 @@
 #include <QMainWindow>
 #include <poppler-annotation.h>
 
-struct Position;
-struct Section;
-using Outline_t = std::vector<Section>;
+#include "outline.h"
 
-struct Position {
-    QString urlOrFilename;
-    int page{-1};
-    QPointF left_top;
-    QRectF boundry;
-};
-
-struct Section {
-    QString title;
-    Position link;
-    Outline_t children;
-};
 
 class Mainwindow : public QMainWindow {
     Q_OBJECT
@@ -44,9 +30,8 @@ class Mainwindow : public QMainWindow {
     void load_page_before();
     void load_page_after();
 
-    void load_outline();
+    void test_load_outline();
     // NOTE: debug
-    void display_outline();
 
     void go_next();
     void go_previous();
@@ -57,7 +42,6 @@ class Mainwindow : public QMainWindow {
 
     Poppler::HighlightAnnotation *make_highlight(QRectF region);
 
-    bool shouldShowWordType(WordType wt) const;
 
     QStringList check_wordlevel(const QStringList &cur);
     QStringList words_forCurPage();

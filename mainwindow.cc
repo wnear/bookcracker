@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <format>
 #include <QThread>
+#include <QCoreApplication>
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 
@@ -106,15 +107,6 @@ class Mainwindow::Private {
     // QListWidget *listwidget{nullptr};
 
     WordlistWidget *wordwgt{nullptr};
-    QListView *wordlistview{nullptr};
-    WordModel *sourceModel{nullptr};
-    WordSortFilterProxyModel *proxyModel{nullptr};
-    WordModel::COLUMN_NO sortorder{WordModel::COLUMN_POS_IN_PAGE};
-
-    QCheckBox *btn_showdict{nullptr};
-    QCheckBox *btn_showConciseWordOnly{nullptr};
-    QCheckBox *btn_showConciseOnly{nullptr};
-    QPushButton *btn_scanscope;
 
     // beware, it's 1-idnexed.
     QLineEdit *edit_setPage{nullptr};
@@ -122,7 +114,6 @@ class Mainwindow::Private {
 
     // pdf dispay helper
     QTransform normalizedTransform;
-    QSizeF pageViewSize;
     QSizeF pageSize;
 
     // pdf
@@ -131,9 +122,8 @@ class Mainwindow::Private {
     int pagewidth = -1;
 
     // #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-    std::unique_ptr<Poppler::Page> pdfpage{nullptr};
-    std::unique_ptr<Poppler::Document> document{nullptr};
-    Outline_t outline;
+    std::shared_ptr<Poppler::Page> pdfpage{nullptr};
+    std::shared_ptr<Poppler::Document> document{nullptr};
     // #else
     //     Poppler::Page *pdfpage{nullptr};
     //     Poppler::Document *document{nullptr};
@@ -165,8 +155,6 @@ Mainwindow::Mainwindow() {
     auto splitter = new QSplitter(this);
     // d->listwidget = new QListWidget(this);
     d->wordstore = make_shared<SqlSave>();
-    // d->listwidget->setModelColumn
-    // auto wordwgt = new QWidget;
     d->wordwgt = new WordlistWidget(this);
     d->wordwgt->setWordStore(d->wordstore);
     d->wordwgt->setupModel(&d->wordItems_in_page);
@@ -179,14 +167,6 @@ Mainwindow::Mainwindow() {
                     d->wordItems_in_page[i]->wordlevel = lv;
                 }
             });
-    // d->wordwgt->setupPageMarkEditCallback(
-    //     [](QList<WordItem *> items, wordlevel_t lv) {
-    //         qDebug() << "mainwindow thread: " << QThread::currentThreadId();
-    //         qDebug() << "mark size: " << items.size();
-    //         for (auto &i : items) {
-    //             qDebug() << "mark to x, with: " << i->content;
-    //         }
-    //     });
     connect(this, &Mainwindow::pageLoadBefore, d->wordwgt,
             &WordlistWidget::onPageLoadBefore);
     connect(this, &Mainwindow::PageLoadDone, d->wordwgt,
@@ -281,9 +261,7 @@ void Mainwindow::openFile(const QString &filename) {
     // d->document->setRenderBackend(Poppler::Document::QPainterBackend);
     d->document->setRenderHint(Poppler::Document::Antialiasing);
     d->document->setRenderHint(Poppler::Document::TextAntialiasing);
-    d->document->outline();
-    load_outline();
-    display_outline();
+    test_load_outline();
     d->pagewidth = d->label->width();
     // this function will only run once, update later.
     d->words_docu_all = words_forDocument();
@@ -385,16 +363,16 @@ void Mainwindow::load_page_before() {
             }
         }
     }
-    // d->sourceModel->reset_data_before();
     emit pageLoadBefore();
     d->wordItems_in_page.clear();
+    // d->wordwgt->update();
+    QCoreApplication::processEvents();
 }
 
 void Mainwindow::load_page_after() {
     // cout << "now have word: " << d->wordstruct_in_page.size()<<endl;
     d->words_page_all = words_forCurPage();
     update_filter();
-    // d->sourceModel->reset_data_after();
     for (auto i : d->wordItems_in_page.keys()) {
         auto &hl = d->wordItems_in_page[i]->highlight;
         auto is_visible = d->wordItems_in_page[i]->isVisible();
@@ -405,9 +383,6 @@ void Mainwindow::load_page_after() {
         }
     }
     // TODO: necessary? maybe for the selection state.
-    // d->wordlistview->reset();
-    // d->proxyModel->sort(WordModel::COLUMN_WORD);
-    // d->proxyModel->sort(d->sortorder);
     emit PageLoadDone();
     update_image();
 }
@@ -483,8 +458,10 @@ QStringList Mainwindow::words_forCurPage() {
     }
     d->wordItems_in_page.clear();
     for (auto i = tx.begin(); i < tx.end(); i++) {
-        auto cur = (*i)->text().simplified();
-        (*i)->boundingBox();
+        auto cur = (*i)->text();
+        if(cur.size() > 1 and cur[0].isUpper() and cur[1].isUpper()){
+            cur = cur.simplified();
+        }
         if (auto res = getWord(carried, cur); res.isEmpty()) {
             continue;
         } else {
@@ -494,24 +471,13 @@ QStringList Mainwindow::words_forCurPage() {
         bool contains = true;
         do {
             if (words_cache.contains(cur)) break;
-            if (cur[0].isUpper()) {
-                for (auto &c : cur) {
-                    c = c.toLower();
-                }
-                if (words_cache.contains(cur)) break;
-            }
+            // if (cur[0].isUpper()) {
+            //     for (auto &c : cur) {
+            //         c = c.toLower();
+            //     }
+            //     if (words_cache.contains(cur)) break;
+            // }
             if (cur[0].isDigit()) break;
-            bool findRelated =
-                std::any_of(suffixes.begin(), suffixes.end(), [&](auto &&sf) {
-                    if (cur.endsWith(sf) && cur.size() > 3 + sf.size()) {
-                        auto sf = cur.left(cur.size() - 2);
-                        if (words_cache.contains(sf)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                });
-            if (findRelated) break;
             contains = false;
         } while (0);
         auto anno_region = make_pair((*i)->boundingBox(), nullptr);
@@ -531,6 +497,7 @@ QStringList Mainwindow::words_forCurPage() {
             x->highlight = {anno_region};
             d->wordItems_in_page[cur] = x;
         }
+
     }
     return res;
 }
@@ -583,26 +550,6 @@ QStringList Mainwindow::words_forDocument() {
     return res;
 }
 
-bool Mainwindow::shouldShowWordType(WordType wt) const {
-    switch (wt) {
-        case KNEW:
-            return false;
-            break;
-        case DICT:
-            return d->btn_showdict == nullptr ? false : d->btn_showdict->isChecked();
-            break;
-        case IGNORED:
-            return false;
-            break;
-        case NEW:
-            return true;
-            break;
-        default:
-            assert(0);
-            break;
-    }
-    return false;
-}
 void Mainwindow::update_image() {
     // FIXME: compile fail. even with `CONFIG += C++20`
     // cout << std::format("renderToImage parameters: width:{}", width)<<endl;
@@ -631,50 +578,17 @@ void Mainwindow::test_scan_annotations() {
 }
 void Mainwindow::load_settings() { d->scale = Settings::instance()->pageScale(); }
 
-void load_section_cur(Section &section, Poppler::OutlineItem &item) {
-    section.title = item.name();
-    auto dest = item.destination();
-    if (dest) section.link.page = dest->pageNumber();
-    for (auto i : item.children()) {
-        Section sub;
-        load_section_cur(sub, i);
-        section.children.push_back(sub);
-    }
+
+void Mainwindow::test_load_outline() {
+    auto outline = Outline();
+    //FIXME: d->dcument, plain pointer to shared_ptr,
+    //sigsegv.
+    return;
+    outline.setDocument(d->document);
+    outline.load_outlie();
+    outline.display_outline();
 }
 
-void Mainwindow::load_outline() {
-    d->outline.clear();
-
-    auto items = d->document->outline();
-    if (items.isEmpty()) {
-        cout << "no outine available.";
-    }
-    for (auto i : items) {
-        Section cur_section;
-        load_section_cur(cur_section, i);
-        if (cur_section.link.page == -1) {
-            // TODO:
-            // maybe exit from here.
-        }
-        d->outline.push_back(cur_section);
-    }
-}
-
-void display_section_cur(const Section &sect, int depth = 0) {
-    for (int i = 0; i < depth; i++) cout << "    ";  // use indent as layer indicator.
-    qDebug() << QString("level %1 %2 at page %3")
-                    .arg(depth)
-                    .arg(sect.title)
-                    .arg(sect.link.page);
-    for (auto sub : sect.children) {
-        display_section_cur(sub, depth + 1);
-    }
-}
-void Mainwindow::display_outline() {
-    for (auto sec : d->outline) {
-        display_section_cur(sec);
-    }
-}
 Poppler::HighlightAnnotation *Mainwindow::make_highlight(QRectF region) {
     auto boundary = d->normalizedTransform.inverted().mapRect(region);
     QList<Poppler::HighlightAnnotation::Quad> quads;

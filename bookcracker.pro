@@ -38,6 +38,7 @@ HEADERS += \
     words.h \
     youdao.h \
     sqlmanager.h \
+    pageview.h \
 
 
 SOURCES += \
@@ -52,6 +53,7 @@ SOURCES += \
     words.cc \
     youdao.cc \
     sqlmanager.cc \
+    pageview.cc \
 
 
 

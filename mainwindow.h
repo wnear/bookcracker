@@ -20,6 +20,7 @@ struct Section {
 };
 
 class Mainwindow : public QMainWindow {
+    Q_OBJECT
   public:
     enum WordType { KNEW, DICT, IGNORED, NEW };
     Mainwindow();
@@ -28,6 +29,10 @@ class Mainwindow : public QMainWindow {
     void setupBtns();
 
     void openFile(const QString &filename);
+
+  signals:
+    void pageLoadBefore();
+    void PageLoadDone();
 
   private:
     void load_settings();
@@ -54,7 +59,7 @@ class Mainwindow : public QMainWindow {
 
     bool shouldShowWordType(WordType wt) const;
 
-    QStringList do_filter(const QStringList &cur);
+    QStringList check_wordlevel(const QStringList &cur);
     QStringList words_forCurPage();
     QStringList words_forDocument();
     // QStringList scavenge_impl(){}

@@ -5,13 +5,15 @@
 #include <QVector>
 #include <poppler-annotation.h>
 
-using wordlevel_t = enum {
+enum wordlevel_t{
     LEVEL_UNKOWN,
     WORD_IS_KNOWN,
     WORD_IS_LEARNING,
     WORD_TOO_HARD,
     WORD_IS_IGNORED,
 };
+
+bool isValidLevel(wordlevel_t lv);
 
 struct WordItem {
     QString content;   // after cleanup.
@@ -34,5 +36,7 @@ struct WordItem {
     }
 };
 
-using WordItemList = QVector<WordItem>;
-using WordItemMap = QMap<QString, WordItem>;
+using WordItemList = QList<WordItem>;
+using WordItemMap = QMap<QString, WordItem*>;
+
+Q_DECLARE_METATYPE(WordItem)

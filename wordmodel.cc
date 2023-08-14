@@ -1,10 +1,14 @@
 #include "wordmodel.h"
 #include <iostream>
+#include <QDebug>
 using namespace std;
 
 QModelIndex WordModel::index(int row, int column, const QModelIndex &parent) const {
-    auto *item = &(m_data[m_data.keys()[row]]);
-    return (row >= 0 && row < this->rowCount()) ? createIndex(row, column, item)
+    if (m_data == nullptr)
+        return QModelIndex();
+    auto x = m_data->value(m_data->keys()[row]);
+    // auto *item = &(x);
+    return (row >= 0 && row < this->rowCount()) ? createIndex(row, column, x)
                                                 : QModelIndex();
 }
 
@@ -15,7 +19,10 @@ QModelIndex WordModel::parent(const QModelIndex &child) const {
 
 int WordModel::rowCount(const QModelIndex &parent) const {
     Q_UNUSED(parent);
-    return m_data.size();
+    if (m_data == nullptr)
+        return 0;
+    else
+        return m_data->size();
 }
 
 int WordModel::columnCount(const QModelIndex &parent) const {
@@ -26,22 +33,22 @@ int WordModel::columnCount(const QModelIndex &parent) const {
 QVariant WordModel::data(const QModelIndex &index, int role) const {
     if (index.isValid()) {
         if (role == Qt::DisplayRole) {
-            auto data = m_data.value(m_data.keys()[index.row()]);
+            auto data = m_data->value(m_data->keys()[index.row()]);
             switch (index.column()) {
                 case COLUMN_WORD: {
-                    return data.original;
+                    return data->original;
                 }
                 case COLUMN_VISIBLE: {
-                    return data.isVisible();
+                    return data->isVisible();
                 }
                 case COLUMN_MEANING: {
-                    return data.meaning;
+                    return data->meaning;
                 }
                 case COLUMN_PAGE: {
-                    return data.id_page;
+                    return data->id_page;
                 }
                 case COLUMN_POS_IN_PAGE: {
-                    return data.id_idx;
+                    return data->id_idx;
                 }
                 default: {
                     return "";
@@ -52,8 +59,9 @@ QVariant WordModel::data(const QModelIndex &index, int role) const {
     return QVariant();
 }
 
-WordModel::WordModel(modeldata_t &document, QObject *parent)
-    : QAbstractItemModel(parent), m_data(document) {}
+WordModel::WordModel(QObject *parent) : QAbstractItemModel(parent) {}
+
+void WordModel::setupModelData(modeldata_t *document) { m_data = document; }
 
 void WordSortFilterProxyModel::updateFilter() { invalidateFilter(); }
 

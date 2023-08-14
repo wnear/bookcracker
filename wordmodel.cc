@@ -7,8 +7,8 @@ QModelIndex WordModel::index(int row, int column, const QModelIndex &parent) con
     if (m_data == nullptr)
         return QModelIndex();
     auto x = m_data->value(m_data->keys()[row]);
-    auto *item = &(x);
-    return (row >= 0 && row < this->rowCount()) ? createIndex(row, column, item)
+    // auto *item = &(x);
+    return (row >= 0 && row < this->rowCount()) ? createIndex(row, column, x)
                                                 : QModelIndex();
 }
 
@@ -36,19 +36,19 @@ QVariant WordModel::data(const QModelIndex &index, int role) const {
             auto data = m_data->value(m_data->keys()[index.row()]);
             switch (index.column()) {
                 case COLUMN_WORD: {
-                    return data.original;
+                    return data->original;
                 }
                 case COLUMN_VISIBLE: {
-                    return data.isVisible();
+                    return data->isVisible();
                 }
                 case COLUMN_MEANING: {
-                    return data.meaning;
+                    return data->meaning;
                 }
                 case COLUMN_PAGE: {
-                    return data.id_page;
+                    return data->id_page;
                 }
                 case COLUMN_POS_IN_PAGE: {
-                    return data.id_idx;
+                    return data->id_idx;
                 }
                 default: {
                     return "";

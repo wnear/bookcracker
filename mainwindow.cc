@@ -176,7 +176,7 @@ Mainwindow::Mainwindow() {
                 // qDebug() << "mark size: " << items.size();
                 for (auto &i : words) {
                     qDebug() << "mark to x, with: " << i;
-                    d->wordItems_in_page[i].wordlevel = lv;
+                    d->wordItems_in_page[i]->wordlevel = lv;
                 }
             });
     // d->wordwgt->setupPageMarkEditCallback(
@@ -377,7 +377,7 @@ void Mainwindow::load_page(int n) {
 #else
 void Mainwindow::load_page_before() {
     for (auto i : d->wordItems_in_page.keys()) {
-        auto &hl = d->wordItems_in_page[i].highlight;
+        auto &hl = d->wordItems_in_page[i]->highlight;
         for (auto i = hl.begin(); i != hl.end(); i++) {
             if (i->second != nullptr) {
                 d->pdfpage->removeAnnotation(i->second);
@@ -396,8 +396,8 @@ void Mainwindow::load_page_after() {
     update_filter();
     // d->sourceModel->reset_data_after();
     for (auto i : d->wordItems_in_page.keys()) {
-        auto &hl = d->wordItems_in_page[i].highlight;
-        auto is_visible = d->wordItems_in_page[i].isVisible();
+        auto &hl = d->wordItems_in_page[i]->highlight;
+        auto is_visible = d->wordItems_in_page[i]->isVisible();
         for (auto i = hl.begin(); i != hl.end(); i++) {
             if (is_visible && i->second == nullptr) {
                 i->second = this->make_highlight(i->first);
@@ -460,7 +460,7 @@ QStringList Mainwindow::check_wordlevel(const QStringList &wordlist) {
     QStringList res;
     for (auto word : d->wordItems_in_page.keys()) {
         auto lv = d->wordstore->getWordLevel(word);
-        d->wordItems_in_page[word].wordlevel = lv;
+        d->wordItems_in_page[word]->wordlevel = lv;
         isValidLevel(lv);
     }
 
@@ -477,6 +477,11 @@ QStringList Mainwindow::words_forCurPage() {
     QStringList res;
     QSet<QString> words_cache;
     QString carried;
+    d->wordItems_in_page.values();
+    for(auto &i: d->wordItems_in_page.values()){
+        delete i;
+    }
+    d->wordItems_in_page.clear();
     for (auto i = tx.begin(); i < tx.end(); i++) {
         auto cur = (*i)->text().simplified();
         (*i)->boundingBox();
@@ -511,20 +516,20 @@ QStringList Mainwindow::words_forCurPage() {
         } while (0);
         auto anno_region = make_pair((*i)->boundingBox(), nullptr);
         if (contains) {
-            d->wordItems_in_page[cur].highlight.push_back(anno_region);
+            d->wordItems_in_page[cur]->highlight.push_back(anno_region);
         } else {
             words_cache.insert(cur);
             res.push_back(cur);
 
-            WordItem x;
-            x.original = cur;
-            x.content = cur;
-            x.id = make_pair(d->pageno, std::distance(i, tx.begin()));
-            x.id_page = d->pageno;
-            x.id_idx = std::distance(i, tx.begin());
+            WordItem *x = new WordItem;
+            x->original = cur;
+            x->content = cur;
+            x->id = make_pair(d->pageno, std::distance(i, tx.begin()));
+            x->id_page = d->pageno;
+            x->id_idx = std::distance(i, tx.begin());
             // x.boundingbox = (*i)->boundingBox();
-            x.highlight = {anno_region};
-            d->wordItems_in_page[cur] = std::move(x);
+            x->highlight = {anno_region};
+            d->wordItems_in_page[cur] = x;
         }
     }
     return res;

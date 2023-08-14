@@ -140,9 +140,9 @@ void WordlistWidget::markSelectionWithLevel(wordlevel_t lv) {
               [](auto &&l, auto &&r) { return l.row() > r.row(); });
     QList<WordItem *> edits;
     QStringList words;
-    for(auto idx: sels){
+    for (auto idx : sels) {
         auto src_idx = d->proxyModel->mapToSource(idx);
-        auto *item = static_cast<WordItem*>(src_idx.internalPointer());
+        auto *item = static_cast<WordItem *>(src_idx.internalPointer());
         auto word = item->content;
         edits.push_back(item);
         words.push_back(word);

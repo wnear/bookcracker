@@ -37,6 +37,6 @@ struct WordItem {
 };
 
 using WordItemList = QList<WordItem>;
-using WordItemMap = QMap<QString, WordItem>;
+using WordItemMap = QMap<QString, WordItem*>;
 
 Q_DECLARE_METATYPE(WordItem)

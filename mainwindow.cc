@@ -106,15 +106,6 @@ class Mainwindow::Private {
     // QListWidget *listwidget{nullptr};
 
     WordlistWidget *wordwgt{nullptr};
-    QListView *wordlistview{nullptr};
-    WordModel *sourceModel{nullptr};
-    WordSortFilterProxyModel *proxyModel{nullptr};
-    WordModel::COLUMN_NO sortorder{WordModel::COLUMN_POS_IN_PAGE};
-
-    QCheckBox *btn_showdict{nullptr};
-    QCheckBox *btn_showConciseWordOnly{nullptr};
-    QCheckBox *btn_showConciseOnly{nullptr};
-    QPushButton *btn_scanscope;
 
     // beware, it's 1-idnexed.
     QLineEdit *edit_setPage{nullptr};
@@ -122,7 +113,6 @@ class Mainwindow::Private {
 
     // pdf dispay helper
     QTransform normalizedTransform;
-    QSizeF pageViewSize;
     QSizeF pageSize;
 
     // pdf
@@ -165,8 +155,6 @@ Mainwindow::Mainwindow() {
     auto splitter = new QSplitter(this);
     // d->listwidget = new QListWidget(this);
     d->wordstore = make_shared<SqlSave>();
-    // d->listwidget->setModelColumn
-    // auto wordwgt = new QWidget;
     d->wordwgt = new WordlistWidget(this);
     d->wordwgt->setWordStore(d->wordstore);
     d->wordwgt->setupModel(&d->wordItems_in_page);
@@ -179,14 +167,6 @@ Mainwindow::Mainwindow() {
                     d->wordItems_in_page[i]->wordlevel = lv;
                 }
             });
-    // d->wordwgt->setupPageMarkEditCallback(
-    //     [](QList<WordItem *> items, wordlevel_t lv) {
-    //         qDebug() << "mainwindow thread: " << QThread::currentThreadId();
-    //         qDebug() << "mark size: " << items.size();
-    //         for (auto &i : items) {
-    //             qDebug() << "mark to x, with: " << i->content;
-    //         }
-    //     });
     connect(this, &Mainwindow::pageLoadBefore, d->wordwgt,
             &WordlistWidget::onPageLoadBefore);
     connect(this, &Mainwindow::PageLoadDone, d->wordwgt,
@@ -385,7 +365,6 @@ void Mainwindow::load_page_before() {
             }
         }
     }
-    // d->sourceModel->reset_data_before();
     emit pageLoadBefore();
     d->wordItems_in_page.clear();
 }
@@ -394,7 +373,6 @@ void Mainwindow::load_page_after() {
     // cout << "now have word: " << d->wordstruct_in_page.size()<<endl;
     d->words_page_all = words_forCurPage();
     update_filter();
-    // d->sourceModel->reset_data_after();
     for (auto i : d->wordItems_in_page.keys()) {
         auto &hl = d->wordItems_in_page[i]->highlight;
         auto is_visible = d->wordItems_in_page[i]->isVisible();
@@ -405,9 +383,6 @@ void Mainwindow::load_page_after() {
         }
     }
     // TODO: necessary? maybe for the selection state.
-    // d->wordlistview->reset();
-    // d->proxyModel->sort(WordModel::COLUMN_WORD);
-    // d->proxyModel->sort(d->sortorder);
     emit PageLoadDone();
     update_image();
 }
@@ -583,26 +558,6 @@ QStringList Mainwindow::words_forDocument() {
     return res;
 }
 
-bool Mainwindow::shouldShowWordType(WordType wt) const {
-    switch (wt) {
-        case KNEW:
-            return false;
-            break;
-        case DICT:
-            return d->btn_showdict == nullptr ? false : d->btn_showdict->isChecked();
-            break;
-        case IGNORED:
-            return false;
-            break;
-        case NEW:
-            return true;
-            break;
-        default:
-            assert(0);
-            break;
-    }
-    return false;
-}
 void Mainwindow::update_image() {
     // FIXME: compile fail. even with `CONFIG += C++20`
     // cout << std::format("renderToImage parameters: width:{}", width)<<endl;

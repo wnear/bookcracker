@@ -57,7 +57,6 @@ class Mainwindow : public QMainWindow {
 
     Poppler::HighlightAnnotation *make_highlight(QRectF region);
 
-    bool shouldShowWordType(WordType wt) const;
 
     QStringList check_wordlevel(const QStringList &cur);
     QStringList words_forCurPage();

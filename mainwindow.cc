@@ -8,6 +8,7 @@
 #include <iostream>
 #include <algorithm>
 #include <format>
+#include <QThread>
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 
@@ -93,6 +94,7 @@ void removeSeletedRowsFromView(QAbstractItemView *view) {
     }
 }
 }  // namespace
+
 class Mainwindow::Private {
   public:
     // settings
@@ -137,10 +139,10 @@ class Mainwindow::Private {
     //     Poppler::Document *document{nullptr};
     // #endif
 
-    std::unique_ptr<SqlSave> wordstore{nullptr};
+    std::shared_ptr<SqlSave> wordstore{nullptr};
     // data, should be consistent.
 
-    QStringList words_page_all;          // all words in current page.
+    QStringList words_page_all;  // all words in current page.
     WordItemMap wordItems_in_page;
 
     QStringList words_docu_all;          // all words in current page.
@@ -162,129 +164,33 @@ Mainwindow::Mainwindow() {
 
     auto splitter = new QSplitter(this);
     // d->listwidget = new QListWidget(this);
-    d->wordstore = make_unique<SqlSave>();
-    if (0) {
-        // TODO: about wordlist's view, two versions are needed.
-        //  1. listview. fixed sort order, may configrued in setting,
-        //  2. detail table view, with frequence, meaning, hardlevel,
-        //
-        d->wordlistview = new QListView(this);
-        d->sourceModel = new WordModel(this);
-        d->sourceModel->setupModelData(&d->wordItems_in_page);
-        d->proxyModel = new WordSortFilterProxyModel(this);
-        d->proxyModel->setSourceModel(d->sourceModel);
-
-        d->wordlistview->setModel(d->proxyModel);
-        d->wordlistview->setSelectionMode(QAbstractItemView::ExtendedSelection);
-        d->wordlistview->setContextMenuPolicy(Qt::CustomContextMenu);
-
-        connect(d->wordlistview, &QWidget::customContextMenuRequested,
-                [this](auto &&pos) {
-                    auto menu = new QMenu;
-                    menu->addAction("test");
-                    menu->addAction("sort by position", [this] {
-                        d->sortorder = WordModel::COLUMN_POS_IN_PAGE;
-                        d->proxyModel->sort(d->sortorder);
-                    });
-                    menu->addAction("sort by alphabeta", [this] {
-                        d->sortorder = WordModel::COLUMN_WORD;
-                        d->proxyModel->sort(d->sortorder);
-                    });
-                    auto sels = d->wordlistview->selectionModel()->selectedIndexes();
-                    if (!sels.isEmpty()) {
-                        menu->addSeparator();
-                        // sort indexes with  x.row() from big to small.
-                        std::sort(sels.begin(), sels.end(),
-                                  [](auto &&l, auto &&r) { return l.row() > r.row(); });
-                        menu->addAction("knew", [this, sels]() {
-                            for (auto idx : sels) {
-                                auto src_idx = d->proxyModel->mapToSource(idx);
-                                auto *ptr = src_idx.internalPointer();
-                                auto *item = static_cast<WordItem *>(ptr);
-                                auto word = item->content;
-                                d->wordstore->updateWord(word, item->wordlevel,
-                                                         WORD_IS_KNOWN);
-                                item->wordlevel = WORD_IS_KNOWN;
-                                d->proxyModel->updateFilter();
-                                qDebug() << QString("mark %1 as knew.").arg(word);
-                            }
-                        });
-                        menu->addAction("ignore", [this, sels]() {
-                            for (auto idx : sels) {
-                                auto src_idx = d->proxyModel->mapToSource(idx);
-                                auto *ptr = src_idx.internalPointer();
-                                auto *item = static_cast<WordItem *>(ptr);
-                                auto word = item->content;
-                                d->wordstore->updateWord(word, item->wordlevel,
-                                                         WORD_IS_IGNORED);
-                                item->wordlevel = WORD_IS_IGNORED;
-                                // d->wordstore->addWordToIgnore(word);
-                                d->proxyModel->updateFilter();
-                                qDebug() << QString("mark %1 as ignore.").arg(word);
-                            }
-                            // auto cur = d->listview.
-                            auto selectionmodel = d->wordlistview->selectionModel();
-                            for (auto idx : selectionmodel->selectedIndexes()) {
-                                auto data = d->wordlistview->model()->itemData(idx);
-                                // d->wordstore->addWordToIgnore(data[0].toString());
-                            }
-                            removeSeletedRowsFromView(d->wordlistview);
-                        });
-                        menu->addAction("add to dict", [this, sels]() {
-                            for (auto idx : sels) {
-                                auto src_idx = d->proxyModel->mapToSource(idx);
-                                auto *ptr = src_idx.internalPointer();
-                                auto *item = static_cast<WordItem *>(ptr);
-                                auto word = item->content;
-                                d->wordstore->updateWord(word, item->wordlevel,
-                                                         WORD_IS_LEARNING);
-                                item->wordlevel = WORD_IS_LEARNING;
-                                // d->wordstore->addWordToIgnore(word);
-                                d->proxyModel->updateFilter();
-                            }
-                        });
-                    }
-
-                    menu->exec(mapToParent(pos));
-                });
-    }
+    d->wordstore = make_shared<SqlSave>();
     // d->listwidget->setModelColumn
-    auto wordwgt = new QWidget;
+    // auto wordwgt = new QWidget;
     d->wordwgt = new WordlistWidget(this);
+    d->wordwgt->setWordStore(d->wordstore);
     d->wordwgt->setupModel(&d->wordItems_in_page);
+    connect(d->wordwgt, &WordlistWidget::markItemsLevel, this,
+            [this](QStringList words, wordlevel_t lv) {
+                qDebug() << "mainwindow thread: " << QThread::currentThreadId();
+                // qDebug() << "mark size: " << items.size();
+                for (auto &i : words) {
+                    qDebug() << "mark to x, with: " << i;
+                    d->wordItems_in_page[i].wordlevel = lv;
+                }
+            });
+    // d->wordwgt->setupPageMarkEditCallback(
+    //     [](QList<WordItem *> items, wordlevel_t lv) {
+    //         qDebug() << "mainwindow thread: " << QThread::currentThreadId();
+    //         qDebug() << "mark size: " << items.size();
+    //         for (auto &i : items) {
+    //             qDebug() << "mark to x, with: " << i->content;
+    //         }
+    //     });
     connect(this, &Mainwindow::pageLoadBefore, d->wordwgt,
             &WordlistWidget::onPageLoadBefore);
     connect(this, &Mainwindow::PageLoadDone, d->wordwgt,
             &WordlistWidget::onPageLoadAfter);
-    if (0) {
-        auto lay = new QVBoxLayout;
-        wordwgt->setLayout(lay);
-        {
-            d->btn_showdict = new QCheckBox("Show word in dict");
-            lay->addWidget(d->btn_showdict);
-            connect(d->btn_showdict, &QAbstractButton::clicked, this,
-                    &Mainwindow::update_filter);
-        }
-
-        {
-            d->btn_showConciseWordOnly = new QCheckBox("Show concise word only");
-            // d->btn_showConciseWordOnly->setChecked();
-            lay->addWidget(d->btn_showConciseWordOnly);
-            connect(d->btn_showConciseWordOnly, &QAbstractButton::clicked, this,
-                    &Mainwindow::update_filter);
-        }
-
-        {
-            d->btn_scanscope = new QPushButton("Switch between doc-page");
-            lay->addWidget(d->btn_scanscope);
-
-            connect(d->btn_scanscope, &QPushButton::clicked, this, [this]() {
-                this->d->scopeIsPage = !this->d->scopeIsPage;
-                update_filter();
-            });
-        }
-        lay->addWidget(d->wordlistview);
-    }
     auto pageShower = new QWidget(this);
     auto pageLay = new QVBoxLayout;
     {
@@ -520,7 +426,6 @@ void Mainwindow::load_page(int n) {
     d->pageSize = d->pdfpage->pageSizeF();
     d->normalizedTransform.reset();
     d->normalizedTransform.scale(d->pageSize.width(), d->pageSize.height());
-
     cout << "load page:" << n << endl;
 
     update_image();
@@ -554,15 +459,15 @@ void Mainwindow::scale_smaller() {
 QStringList Mainwindow::check_wordlevel(const QStringList &wordlist) {
     QStringList res;
     for (auto word : d->wordItems_in_page.keys()) {
-        d->wordItems_in_page[word].wordlevel = d->wordstore->getWordLevel(word);
+        auto lv = d->wordstore->getWordLevel(word);
+        d->wordItems_in_page[word].wordlevel = lv;
+        isValidLevel(lv);
     }
 
     return {};
 }
 
-void Mainwindow::update_filter() {
-    check_wordlevel(d->words_page_all);
-}
+void Mainwindow::update_filter() { check_wordlevel(d->words_page_all); }
 
 QStringList Mainwindow::words_forCurPage() {
     auto tx = d->pdfpage->textList();

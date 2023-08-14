@@ -123,7 +123,7 @@ class Mainwindow::Private {
 
     // #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
     std::shared_ptr<Poppler::Page> pdfpage{nullptr};
-    std::shared_ptr<Poppler::Document> document{nullptr};
+    Poppler::Document *document{nullptr};
     // #else
     //     Poppler::Page *pdfpage{nullptr};
     //     Poppler::Document *document{nullptr};
@@ -252,8 +252,8 @@ void Mainwindow::openFile(const QString &filename) {
         cout << "load file fail, file not exist" << endl;
         return;
     }
+    d->document = Poppler::Document::load(filename);
 
-    d->document = std::unique_ptr<Poppler::Document>(Poppler::Document::load(filename));
     d->label_showPageNo->setText(QString(" of %1").arg(d->document->numPages()));
     d->edit_setPage->setValidator(new QIntValidator(1, d->document->numPages(), this));
     // cout <<"backend: "<< d->document->availableRenderBackends().size()<<endl;
@@ -581,9 +581,6 @@ void Mainwindow::load_settings() { d->scale = Settings::instance()->pageScale();
 
 void Mainwindow::test_load_outline() {
     auto outline = Outline();
-    //FIXME: d->dcument, plain pointer to shared_ptr,
-    //sigsegv.
-    return;
     outline.setDocument(d->document);
     outline.load_outlie();
     outline.display_outline();

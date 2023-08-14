@@ -6,8 +6,16 @@ using namespace std;
 class Outline::Private {
   public:
     Outline_t outline;
-    std::shared_ptr<Poppler::Document> document{nullptr};
+    document_t* document{nullptr};
+    ~Private(){
+        document = nullptr;
+    }
 };
+
+Outline::Outline() {
+    d = new Private;
+}
+
 void load_section_cur(Section &section, Poppler::OutlineItem &item) {
     section.title = item.name();
     auto dest = item.destination();
@@ -53,6 +61,7 @@ void Outline::display_outline() {
         display_section_cur(sec);
     }
 }
-void Outline::setDocument(std::shared_ptr<Poppler::Document> doc) {
+void Outline::setDocument(document_t * doc) {
     d->document = doc;
 }
+

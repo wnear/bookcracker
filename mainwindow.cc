@@ -122,9 +122,8 @@ class Mainwindow::Private {
     int pagewidth = -1;
 
     // #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-    std::unique_ptr<Poppler::Page> pdfpage{nullptr};
-    std::unique_ptr<Poppler::Document> document{nullptr};
-    Outline_t outline;
+    std::shared_ptr<Poppler::Page> pdfpage{nullptr};
+    std::shared_ptr<Poppler::Document> document{nullptr};
     // #else
     //     Poppler::Page *pdfpage{nullptr};
     //     Poppler::Document *document{nullptr};
@@ -262,9 +261,7 @@ void Mainwindow::openFile(const QString &filename) {
     // d->document->setRenderBackend(Poppler::Document::QPainterBackend);
     d->document->setRenderHint(Poppler::Document::Antialiasing);
     d->document->setRenderHint(Poppler::Document::TextAntialiasing);
-    d->document->outline();
-    load_outline();
-    display_outline();
+    test_load_outline();
     d->pagewidth = d->label->width();
     // this function will only run once, update later.
     d->words_docu_all = words_forDocument();
@@ -581,50 +578,17 @@ void Mainwindow::test_scan_annotations() {
 }
 void Mainwindow::load_settings() { d->scale = Settings::instance()->pageScale(); }
 
-void load_section_cur(Section &section, Poppler::OutlineItem &item) {
-    section.title = item.name();
-    auto dest = item.destination();
-    if (dest) section.link.page = dest->pageNumber();
-    for (auto i : item.children()) {
-        Section sub;
-        load_section_cur(sub, i);
-        section.children.push_back(sub);
-    }
+
+void Mainwindow::test_load_outline() {
+    auto outline = Outline();
+    //FIXME: d->dcument, plain pointer to shared_ptr,
+    //sigsegv.
+    return;
+    outline.setDocument(d->document);
+    outline.load_outlie();
+    outline.display_outline();
 }
 
-void Mainwindow::load_outline() {
-    d->outline.clear();
-
-    auto items = d->document->outline();
-    if (items.isEmpty()) {
-        cout << "no outine available.";
-    }
-    for (auto i : items) {
-        Section cur_section;
-        load_section_cur(cur_section, i);
-        if (cur_section.link.page == -1) {
-            // TODO:
-            // maybe exit from here.
-        }
-        d->outline.push_back(cur_section);
-    }
-}
-
-void display_section_cur(const Section &sect, int depth = 0) {
-    for (int i = 0; i < depth; i++) cout << "    ";  // use indent as layer indicator.
-    qDebug() << QString("level %1 %2 at page %3")
-                    .arg(depth)
-                    .arg(sect.title)
-                    .arg(sect.link.page);
-    for (auto sub : sect.children) {
-        display_section_cur(sub, depth + 1);
-    }
-}
-void Mainwindow::display_outline() {
-    for (auto sec : d->outline) {
-        display_section_cur(sec);
-    }
-}
 Poppler::HighlightAnnotation *Mainwindow::make_highlight(QRectF region) {
     auto boundary = d->normalizedTransform.inverted().mapRect(region);
     QList<Poppler::HighlightAnnotation::Quad> quads;

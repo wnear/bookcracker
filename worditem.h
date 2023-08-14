@@ -13,6 +13,8 @@ enum wordlevel_t{
     WORD_IS_IGNORED,
 };
 
+bool isValidLevel(wordlevel_t lv);
+
 struct WordItem {
     QString content;   // after cleanup.
     QString original;  // directed frm the text
@@ -34,5 +36,7 @@ struct WordItem {
     }
 };
 
-using WordItemList = QVector<WordItem>;
+using WordItemList = QList<WordItem>;
 using WordItemMap = QMap<QString, WordItem>;
+
+Q_DECLARE_METATYPE(WordItem)

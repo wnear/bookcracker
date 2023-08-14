@@ -4,6 +4,8 @@
 using namespace std;
 
 QModelIndex WordModel::index(int row, int column, const QModelIndex &parent) const {
+    if (m_data == nullptr)
+        return QModelIndex();
     auto x = m_data->value(m_data->keys()[row]);
     auto *item = &(x);
     return (row >= 0 && row < this->rowCount()) ? createIndex(row, column, item)

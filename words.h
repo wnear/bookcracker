@@ -60,8 +60,12 @@ class Words {
 
     virtual void updateWord(const QString &word, wordlevel_t old_level,
                             wordlevel_t new_level) {
+        assert(isValidLevel(old_level));
+        assert(isValidLevel(new_level));
         m_dicts[new_level]->insert(word);
-        if (old_level != LEVEL_UNKOWN) m_dicts[old_level]->erase(word);
+        if (old_level != LEVEL_UNKOWN) {
+            m_dicts[old_level]->erase(word);
+        }
     }
 };
 

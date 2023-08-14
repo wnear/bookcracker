@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <format>
 #include <QThread>
+#include <QCoreApplication>
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 
@@ -367,6 +368,8 @@ void Mainwindow::load_page_before() {
     }
     emit pageLoadBefore();
     d->wordItems_in_page.clear();
+    // d->wordwgt->update();
+    QCoreApplication::processEvents();
 }
 
 void Mainwindow::load_page_after() {
@@ -458,8 +461,10 @@ QStringList Mainwindow::words_forCurPage() {
     }
     d->wordItems_in_page.clear();
     for (auto i = tx.begin(); i < tx.end(); i++) {
-        auto cur = (*i)->text().simplified();
-        (*i)->boundingBox();
+        auto cur = (*i)->text();
+        if(cur.size() > 1 and cur[0].isUpper() and cur[1].isUpper()){
+            cur = cur.simplified();
+        }
         if (auto res = getWord(carried, cur); res.isEmpty()) {
             continue;
         } else {
@@ -469,24 +474,13 @@ QStringList Mainwindow::words_forCurPage() {
         bool contains = true;
         do {
             if (words_cache.contains(cur)) break;
-            if (cur[0].isUpper()) {
-                for (auto &c : cur) {
-                    c = c.toLower();
-                }
-                if (words_cache.contains(cur)) break;
-            }
+            // if (cur[0].isUpper()) {
+            //     for (auto &c : cur) {
+            //         c = c.toLower();
+            //     }
+            //     if (words_cache.contains(cur)) break;
+            // }
             if (cur[0].isDigit()) break;
-            bool findRelated =
-                std::any_of(suffixes.begin(), suffixes.end(), [&](auto &&sf) {
-                    if (cur.endsWith(sf) && cur.size() > 3 + sf.size()) {
-                        auto sf = cur.left(cur.size() - 2);
-                        if (words_cache.contains(sf)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                });
-            if (findRelated) break;
             contains = false;
         } while (0);
         auto anno_region = make_pair((*i)->boundingBox(), nullptr);
@@ -506,6 +500,7 @@ QStringList Mainwindow::words_forCurPage() {
             x->highlight = {anno_region};
             d->wordItems_in_page[cur] = x;
         }
+
     }
     return res;
 }

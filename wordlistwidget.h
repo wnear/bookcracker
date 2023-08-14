@@ -10,6 +10,7 @@ class WordlistWidget : public QWidget {
     void setupModel(WordItemMap *data);
   signals:
     void updateFilter();
+    void markItemsLevel(QStringList items, wordlevel_t);
   public slots:
     void onPageLoadBefore();
     void onPageLoadAfter();

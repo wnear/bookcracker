@@ -17,6 +17,7 @@
 #include "wordmodel.h"
 #include "words.h"
 #include <QCheckBox>
+#include <QThread>
 
 void removeSeletedRowsFromView(QAbstractItemView *view) {
     auto selections = view->selectionModel()->selectedIndexes();
@@ -119,29 +120,37 @@ void WordlistWidget::onListViewContextMenu(const QPoint &pos) {
         menu->addSeparator();
         // sort indexes with  x.row() from big to small.
         menu->addAction("knew", [this]() {
+            qDebug() << "mark as knew.";
             this->markSelectionWithLevel(WORD_IS_KNOWN);
         });
-        menu->addAction("ignore", [this]() {
-            this->markSelectionWithLevel(WORD_IS_IGNORED);
-        });
-        menu->addAction("add to dict", [this]() {
-            this->markSelectionWithLevel(WORD_IS_LEARNING);
-        });
+        menu->addAction("ignore",
+                        [this]() { this->markSelectionWithLevel(WORD_IS_IGNORED); });
+        menu->addAction("add to dict",
+                        [this]() { this->markSelectionWithLevel(WORD_IS_LEARNING); });
     }
     menu->exec(mapToGlobal(pos));
 }
+
+// NOTE: need to do multiple-things
+// edit the page-view highlight
+// edit the item status, remove from list-view.
 void WordlistWidget::markSelectionWithLevel(wordlevel_t lv) {
     auto sels = d->wordlistview->selectionModel()->selectedIndexes();
     std::sort(sels.begin(), sels.end(),
               [](auto &&l, auto &&r) { return l.row() > r.row(); });
-    for (auto idx : sels) {
+    QList<WordItem *> edits;
+    QStringList words;
+    for(auto idx: sels){
         auto src_idx = d->proxyModel->mapToSource(idx);
-        auto *ptr = src_idx.internalPointer();
-        auto *item = static_cast<WordItem *>(ptr);
+        auto *item = static_cast<WordItem*>(src_idx.internalPointer());
         auto word = item->content;
+        edits.push_back(item);
+        words.push_back(word);
         d->wordstore->updateWord(word, item->wordlevel, lv);
-        item->wordlevel = lv;
     }
+
+    emit markItemsLevel(words, lv);
+
     d->proxyModel->updateFilter();
 }
 
@@ -152,4 +161,3 @@ void WordlistWidget::onPageLoadAfter() {
     d->wordlistview->reset();
     d->proxyModel->sort(d->sortorder);
 }
-

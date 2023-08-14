@@ -1,13 +1,13 @@
 #include <QWidget>
 #include "worditem.h"
+#include "words.h"
 
 class WordlistWidget : public QWidget {
     Q_OBJECT
   public:
     WordlistWidget(QWidget *parent = nullptr);
-    void setWords(const QStringList &words);
+    void setWordStore(std::shared_ptr<SqlSave> wordstore);
     void setupModel(WordItemMap *data);
-    bool showx();
   signals:
     void updateFilter();
   public slots:
@@ -15,7 +15,8 @@ class WordlistWidget : public QWidget {
     void onPageLoadAfter();
     void onListViewContextMenu(const QPoint &pos);
 
-  protected:
+  private:
+    void markSelectionWithLevel(wordlevel_t lv);
 
   private:
     struct PrivateData *d;

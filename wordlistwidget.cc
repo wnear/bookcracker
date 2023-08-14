@@ -41,6 +41,8 @@ struct PrivateData {
     QCheckBox *btn_showConciseWordOnly{nullptr};
     QCheckBox *btn_showConciseOnly{nullptr};
     QPushButton *btn_scanscope;
+
+    std::shared_ptr<SqlSave> wordstore{nullptr};
 };
 
 WordlistWidget::WordlistWidget(QWidget *parent) : QWidget(parent) {
@@ -88,6 +90,11 @@ WordlistWidget::WordlistWidget(QWidget *parent) : QWidget(parent) {
     connect(d->wordlistview, &QWidget::customContextMenuRequested, this,
             &WordlistWidget::onListViewContextMenu);
 }
+
+void WordlistWidget::setWordStore(std::shared_ptr<SqlSave> wordstore) {
+    d->wordstore = wordstore;
+}
+
 void WordlistWidget::setupModel(WordItemMap *data) {
     qDebug() << __PRETTY_FUNCTION__;
     if (d->sourceModel == nullptr) {
@@ -96,7 +103,6 @@ void WordlistWidget::setupModel(WordItemMap *data) {
     d->sourceModel->setupModelData(data);
 }
 
-bool WordlistWidget::showx() { return d->btn_showdict->isChecked(); };
 void WordlistWidget::onListViewContextMenu(const QPoint &pos) {
     auto menu = new QMenu;
     menu->addAction("test");
@@ -112,49 +118,33 @@ void WordlistWidget::onListViewContextMenu(const QPoint &pos) {
     if (!sels.isEmpty()) {
         menu->addSeparator();
         // sort indexes with  x.row() from big to small.
-        std::sort(sels.begin(), sels.end(),
-                  [](auto &&l, auto &&r) { return l.row() > r.row(); });
-        menu->addAction("knew", [this, sels]() {
-            for (auto idx : sels) {
-                auto src_idx = d->proxyModel->mapToSource(idx);
-                auto *ptr = src_idx.internalPointer();
-                auto *item = static_cast<WordItem *>(ptr);
-                item->wordlevel = WORD_IS_KNOWN;
-                auto word = item->content;
-                d->proxyModel->updateFilter();
-            }
+        menu->addAction("knew", [this]() {
+            this->markSelectionWithLevel(WORD_IS_KNOWN);
         });
-        menu->addAction("ignore", [this, sels]() {
-            for (auto idx : sels) {
-                auto src_idx = d->proxyModel->mapToSource(idx);
-                auto *ptr = src_idx.internalPointer();
-                auto *item = static_cast<WordItem *>(ptr);
-                item->wordlevel = WORD_IS_IGNORED;
-                auto word = item->content;
-                d->proxyModel->updateFilter();
-            }
-            // auto cur = d->listview.
-            auto selectionmodel = d->wordlistview->selectionModel();
-            for (auto idx : selectionmodel->selectedIndexes()) {
-                auto data = d->wordlistview->model()->itemData(idx);
-            }
-            removeSeletedRowsFromView(d->wordlistview);
+        menu->addAction("ignore", [this]() {
+            this->markSelectionWithLevel(WORD_IS_IGNORED);
         });
-        menu->addAction("add to dict", [this, sels]() {
-            for (auto idx : sels) {
-                auto src_idx = d->proxyModel->mapToSource(idx);
-                auto *ptr = src_idx.internalPointer();
-                auto *item = static_cast<WordItem *>(ptr);
-                item->wordlevel = WORD_IS_LEARNING;
-                auto word = item->content;
-                d->proxyModel->updateFilter();
-            }
+        menu->addAction("add to dict", [this]() {
+            this->markSelectionWithLevel(WORD_IS_LEARNING);
         });
     }
     menu->exec(mapToGlobal(pos));
 }
-// auto pos =
-void WordlistWidget::setWords(const QStringList &words) {}
+void WordlistWidget::markSelectionWithLevel(wordlevel_t lv) {
+    auto sels = d->wordlistview->selectionModel()->selectedIndexes();
+    std::sort(sels.begin(), sels.end(),
+              [](auto &&l, auto &&r) { return l.row() > r.row(); });
+    for (auto idx : sels) {
+        auto src_idx = d->proxyModel->mapToSource(idx);
+        auto *ptr = src_idx.internalPointer();
+        auto *item = static_cast<WordItem *>(ptr);
+        auto word = item->content;
+        d->wordstore->updateWord(word, item->wordlevel, lv);
+        item->wordlevel = lv;
+    }
+    d->proxyModel->updateFilter();
+}
+
 void WordlistWidget::onPageLoadBefore() { d->sourceModel->reset_data_before(); }
 
 void WordlistWidget::onPageLoadAfter() {
@@ -162,3 +152,4 @@ void WordlistWidget::onPageLoadAfter() {
     d->wordlistview->reset();
     d->proxyModel->sort(d->sortorder);
 }
+

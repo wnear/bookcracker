@@ -261,10 +261,10 @@ void Mainwindow::openFile(const QString &filename) {
     // d->document->setRenderBackend(Poppler::Document::QPainterBackend);
     d->document->setRenderHint(Poppler::Document::Antialiasing);
     d->document->setRenderHint(Poppler::Document::TextAntialiasing);
-    test_load_outline();
     d->pagewidth = d->label->width();
     // this function will only run once, update later.
     d->words_docu_all = words_forDocument();
+    test_load_outline();
     test_scan_annotations();
     this->go_to(0);
 }
@@ -277,12 +277,12 @@ Mainwindow::~Mainwindow() {
 void Mainwindow::go_to(int n) {
     int page_max = this->d->document->numPages();
     int page_cur = n;
-    if (page_cur < 0) pageno = 0;
+    if (page_cur < 0) page_cur = 0;
     if (page_cur >= page_max) {
         page_cur = page_max - 1;
     }
     // wont turn page.
-    if (page_cur == d->pageno) return;
+    if (page_cur == d->page_cur) return;
     this->load_page(page_cur);
 }
 

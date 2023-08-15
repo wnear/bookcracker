@@ -5,12 +5,18 @@
 #include <QFileInfo>
 
 #include "pageitem.h"
+#include <poppler-qt5.h>
 
 
 class PageView : public QWidget {
     Q_OBJECT
   public:
     PageView(QWidget *parent = nullptr);
+    void load(Poppler::Document *docu){
+        for(int i = 0; i< docu->numPages(); i++){
+            m_pages.push_back(docu->page(i));
+        }
+    }
     void autoscale();
     void setScale(float incr);
     QSize boardSize() const;
@@ -23,6 +29,7 @@ class PageView : public QWidget {
     QGraphicsView *m_view{nullptr};
     PageItem *m_photoItem{nullptr};
 
+    QList<Poppler::Page*> m_pages; //TODO: optimi
     QFileInfoList m_filelist{};
     int m_index{0};
     QPixmap m_pixmap;

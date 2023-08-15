@@ -17,6 +17,7 @@ class Mainwindow : public QMainWindow {
     void openFile(const QString &filename);
 
   signals:
+    //NOTE: directConnection signal-slot <=> cb on event.
     void pageLoadBefore();
     void PageLoadDone();
 
@@ -27,8 +28,6 @@ class Mainwindow : public QMainWindow {
     // NOTE: following two method is called by load_page(),
     // do the job before and after the page-no is changed,
     // now maily related to annotation management.
-    void load_page_before();
-    void load_page_after();
 
     void test_load_outline();
     // NOTE: debug

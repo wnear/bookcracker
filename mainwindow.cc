@@ -110,7 +110,7 @@ class Mainwindow::Private {
 
     // beware, it's 1-idnexed.
     QLineEdit *edit_setPage{nullptr};
-    QLabel *label_showPageNo{nullptr};
+    QLabel *label_showpage_cur{nullptr};
 
     // pdf dispay helper
     QTransform normalizedTransform;
@@ -118,7 +118,7 @@ class Mainwindow::Private {
 
     // pdf
     QString filename;
-    int pageno{0};
+    int page_cur{0};
     int pagewidth = -1;
 
     // #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
@@ -200,8 +200,8 @@ Mainwindow::Mainwindow() {
         d->edit_setPage->setAlignment(Qt::AlignRight);
         toolbar_lay->addWidget(d->edit_setPage);
         // toolbar_lay->addWidget(new QLabel(" of "));
-        d->label_showPageNo = new QLabel(this);
-        toolbar_lay->addWidget(d->label_showPageNo);
+        d->label_showpage_cur = new QLabel(this);
+        toolbar_lay->addWidget(d->label_showpage_cur);
         connect(d->edit_setPage, &QLineEdit::returnPressed, this, [this]() {
             auto txt = d->edit_setPage->text();
             this->go_to(txt.toInt() - 1);
@@ -254,17 +254,17 @@ void Mainwindow::openFile(const QString &filename) {
     }
     d->document = Poppler::Document::load(filename);
 
-    d->label_showPageNo->setText(QString(" of %1").arg(d->document->numPages()));
+    d->label_showpage_cur->setText(QString(" of %1").arg(d->document->numPages()));
     d->edit_setPage->setValidator(new QIntValidator(1, d->document->numPages(), this));
     // cout <<"backend: "<< d->document->availableRenderBackends().size()<<endl;
     // cout << "backend: now"<< d->document->renderBackend() << endl;
     // d->document->setRenderBackend(Poppler::Document::QPainterBackend);
     d->document->setRenderHint(Poppler::Document::Antialiasing);
     d->document->setRenderHint(Poppler::Document::TextAntialiasing);
-    test_load_outline();
     d->pagewidth = d->label->width();
     // this function will only run once, update later.
     d->words_docu_all = words_forDocument();
+    test_load_outline();
     test_scan_annotations();
     this->go_to(0);
 }
@@ -276,24 +276,24 @@ Mainwindow::~Mainwindow() {
 
 void Mainwindow::go_to(int n) {
     int page_max = this->d->document->numPages();
-    int pageno = n;
-    if (pageno < 0) pageno = 0;
-    if (pageno >= page_max) {
-        pageno = page_max - 1;
+    int page_cur = n;
+    if (page_cur < 0) page_cur = 0;
+    if (page_cur >= page_max) {
+        page_cur = page_max - 1;
     }
     // wont turn page.
-    if (pageno == d->pageno) return;
-    this->load_page(pageno);
+    if (page_cur == d->page_cur) return;
+    this->load_page(page_cur);
 }
 
-void Mainwindow::go_previous() { this->go_to(d->pageno - 1); }
+void Mainwindow::go_previous() { this->go_to(d->page_cur - 1); }
 
-void Mainwindow::go_next() { this->go_to(d->pageno + 1); }
+void Mainwindow::go_next() { this->go_to(d->page_cur + 1); }
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 void Mainwindow::load_page(int n) {
-    d->pageno = n;
-    d->pdfpage = d->document->page(d->pageno);
+    d->page_cur = n;
+    d->pdfpage = d->document->page(d->page_cur);
     cout << "load page:" << n << endl;
 
     d->words_page_all = words_forCurPage();
@@ -353,7 +353,10 @@ void Mainwindow::load_page(int n) {
     update_image();
 }
 #else
-void Mainwindow::load_page_before() {
+
+void Mainwindow::load_page(int n) {
+    assert(d->page_cur != n);
+    // 1. before swtich page, release load for current page.
     for (auto i : d->wordItems_in_page.keys()) {
         auto &hl = d->wordItems_in_page[i]->highlight;
         for (auto i = hl.begin(); i != hl.end(); i++) {
@@ -367,9 +370,21 @@ void Mainwindow::load_page_before() {
     d->wordItems_in_page.clear();
     // d->wordwgt->update();
     QCoreApplication::processEvents();
-}
 
-void Mainwindow::load_page_after() {
+    // 2. load new page, directly from the qpoppler, draw it for display.
+    d->page_cur = n;
+    d->edit_setPage->setText(QString("%1").arg(d->page_cur + 1));
+    // d->pdfpage = d->document->page(d->page_cur);
+    d->pdfpage = std::unique_ptr<Poppler::Page>(d->document->page(d->page_cur));
+    d->pageSize = d->pdfpage->pageSizeF();
+    d->normalizedTransform.reset();
+    d->normalizedTransform.scale(d->pageSize.width(), d->pageSize.height());
+    cout << "load page:" << n << endl;
+
+    update_image();
+
+    // 3. do heavy job after the load.
+    // calcualte the words after filter, and redraw.
     // cout << "now have word: " << d->wordstruct_in_page.size()<<endl;
     d->words_page_all = words_forCurPage();
     update_filter();
@@ -385,29 +400,6 @@ void Mainwindow::load_page_after() {
     // TODO: necessary? maybe for the selection state.
     emit PageLoadDone();
     update_image();
-}
-
-void Mainwindow::load_page(int n) {
-    assert(d->pageno != n);
-
-    // 1. before swtich page, release load for current page.
-    load_page_before();
-
-    // 2. load new page, directly from the qpoppler, draw it for display.
-    d->pageno = n;
-    d->edit_setPage->setText(QString("%1").arg(d->pageno + 1));
-    // d->pdfpage = d->document->page(d->pageno);
-    d->pdfpage = std::unique_ptr<Poppler::Page>(d->document->page(d->pageno));
-    d->pageSize = d->pdfpage->pageSizeF();
-    d->normalizedTransform.reset();
-    d->normalizedTransform.scale(d->pageSize.width(), d->pageSize.height());
-    cout << "load page:" << n << endl;
-
-    update_image();
-
-    // 3. do heavy job after the load.
-    // calcualte the words after filter, and redraw.
-    load_page_after();
 }
 #endif
 
@@ -490,8 +482,8 @@ QStringList Mainwindow::words_forCurPage() {
             WordItem *x = new WordItem;
             x->original = cur;
             x->content = cur;
-            x->id = make_pair(d->pageno, std::distance(i, tx.begin()));
-            x->id_page = d->pageno;
+            x->id = make_pair(d->page_cur, std::distance(i, tx.begin()));
+            x->id_page = d->page_cur;
             x->id_idx = std::distance(i, tx.begin());
             // x.boundingbox = (*i)->boundingBox();
             x->highlight = {anno_region};
@@ -509,7 +501,7 @@ bool findword(c_t c, QString &word) {
 }
 
 QStringList Mainwindow::words_forDocument() {
-    // auto pagex = d->pageno;
+    // auto pagex = d->page_cur;
     QStringList suffixes{"s", "es", "ed", "ing"};
     QStringList res;
     QSet<QString> words_cache;

@@ -10,6 +10,7 @@
 #include <format>
 #include <QThread>
 #include <QCoreApplication>
+#include "pagecontainer.h"
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 
@@ -103,7 +104,7 @@ class Mainwindow::Private {
 
     // gui
     QTextEdit *x{nullptr};
-    QLabel *label{nullptr};
+    PageContainer *page_continer{nullptr};
     // QListWidget *listwidget{nullptr};
 
     WordlistWidget *wordwgt{nullptr};
@@ -174,8 +175,8 @@ Mainwindow::Mainwindow() {
     auto pageShower = new QWidget(this);
     auto pageLay = new QVBoxLayout;
     {
-        d->label = new QLabel(this);
-        pageLay->addWidget(d->label);
+        d->page_continer = new PageContainer(this);
+        pageLay->addWidget(d->page_continer);
     }
 
     pageShower->setLayout(pageLay);
@@ -261,7 +262,7 @@ void Mainwindow::openFile(const QString &filename) {
     // d->document->setRenderBackend(Poppler::Document::QPainterBackend);
     d->document->setRenderHint(Poppler::Document::Antialiasing);
     d->document->setRenderHint(Poppler::Document::TextAntialiasing);
-    d->pagewidth = d->label->width();
+    d->pagewidth = d->page_continer->width();
     // this function will only run once, update later.
     d->words_docu_all = words_forDocument();
     test_load_outline();
@@ -557,7 +558,7 @@ void Mainwindow::update_image() {
     auto image =
         d->pdfpage->renderToImage(d->scale * xres, d->scale * yres, 0, 0,
                                   page_view_size.width(), page_view_size.height());
-    d->label->setPixmap(QPixmap::fromImage(image));
+    d->page_continer->setPixmap(QPixmap::fromImage(image));
 }
 void Mainwindow::test_scan_annotations() {
     for (int i = 0; i < d->document->numPages(); i++) {

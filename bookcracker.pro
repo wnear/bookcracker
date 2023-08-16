@@ -41,6 +41,7 @@ HEADERS += \
     pageitem.h \
     pageview.h \
     outline.h \
+    pagecontainer.h \
 
 
 SOURCES += \
@@ -58,6 +59,7 @@ SOURCES += \
     pageitem.cc \
     pageview.cc \
     outline.cc \
+    pagecontainer.cc \
 
 
 

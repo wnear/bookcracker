@@ -12,47 +12,23 @@
 //
 PageItem::PageItem(QGraphicsItem *parent) : QGraphicsObject(parent) {
     // this->setFlags(QGraphicsItem::ItemIsMovable);
+
+    m_effect = new QGraphicsDropShadowEffect;
+    m_effect->setOffset(3);
+    // qDebug()<<m_effect->color();
+    // m_effect->setColor(Qt::black);
+    m_effect->setBlurRadius(20);
+    this->setGraphicsEffect(m_effect);
 }
 
 void PageItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                       QWidget *widget) {
     painter->drawPixmap(m_pixmap.rect(), m_pixmap);
 
+    //NOTE: how to get itm's current scale, api exist?
     // line thickness should depend on the scale.
     painter->setPen(QPen(Qt::black, 1 / m_scale));
     painter->drawRect(m_pixmap.rect());
-
-    auto shadow_real = m_padding_shadow / m_scale;
-    auto p1 = this->boundingRect().topRight();
-    auto p2 = this->boundingRect().bottomRight();
-    auto p3 = this->boundingRect().bottomLeft();
-    QGradientStops stops;
-    stops << QGradientStop(0.0, Qt::black);
-    stops << QGradientStop(1.0, m_board_bgcolor);
-
-    QLinearGradient gradient(this->boundingRect().topRight(),
-                             this->boundingRect().topRight() + QPointF(shadow_real, 0));
-    painter->setPen(Qt::NoPen);
-    gradient.setStops(stops);
-    painter->setBrush(QBrush(gradient));
-    QPointF points[4] = {
-        p1, p1 + QPointF(shadow_real, 1 *shadow_real),
-        p2 + QPointF(shadow_real, 1* shadow_real), p2
-    };
-    painter->drawConvexPolygon(points, 4);
-
-    QLinearGradient gradient2(this->boundingRect().bottomLeft(),
-                             this->boundingRect().bottomLeft() + QPointF(0, shadow_real));
-    gradient2.setStops(stops);
-    painter->setBrush(QBrush(gradient2));
-    QPointF points2[4] = {
-        p2, p2 + QPointF(shadow_real, 1 *shadow_real),
-        p3 + QPointF(shadow_real, 1* shadow_real), p3
-    };
-    painter->drawConvexPolygon(points2, 4);
-
-    // painter->setBrush(Qt::darkGray);
-    // painter->drawRect(m_pixmap.rect());
 }
 
 void PageItem::setBoardSize(QSize val) { m_board_size = val; }
@@ -84,6 +60,9 @@ double PageItem::getScale() { return m_scale; }
 void PageItem::setImage(const QPixmap &pix) {
     m_pixmap = pix;
     recalScale();
+    m_effect->setOffset(3);
+    m_effect->setColor(Qt::black);
+    m_effect->setBlurRadius(20);
     assert(!m_pixmap.isNull());
     emit photoChanged();
 }

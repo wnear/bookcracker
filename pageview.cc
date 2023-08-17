@@ -12,8 +12,6 @@
 #include <QDebug>
 #include <QCoreApplication>
 
-
-
 // TODO:
 // 0. auto scale. (scale to best view.)
 //   0. size with value.
@@ -64,13 +62,32 @@ QString getWord(QString &carried, QString cur) {
 }
 }  // namespace
 
+class PageView::Private {
+  public:
+    int page_cur{-1};
+    double scale;
+    int page_max;                //[0, pagemax] 0-based.
+    QStringList words_page_all;  // all words in current page.
+    WordItemMap wordItems_in_page;
+    std::shared_ptr<SqlSave> wordstore{nullptr};
+
+    Poppler::Document *document;
+    QTransform normalizedTransform;
+
+    std::shared_ptr<Poppler::Page> pdfpage{nullptr};
+    QSizeF pageSize;
+};
+
 PageView::PageView(QWidget *parent) : QWidget(parent) {
+    d = new Private;
+    d->wordstore = make_shared<SqlSave>();
+
     this->setLayout(new QVBoxLayout);
 
     m_photoItem = new PageItem;
     m_photoItem->setPos(0, 0);
     m_filelist = QDir("/home/bill/Pictures").entryInfoList({"*.png", "*.jpg"});
-    go_next();
+    // go_next();
 
     m_scene = new QGraphicsScene(0, 0, 400, 400);
     m_scene->addItem(m_photoItem);
@@ -148,41 +165,37 @@ void PageView::displayInfo() const {
 
 QSize PageView::boardSize() const {
     return {m_view->contentsRect().width() - 2 * m_padding_leftright,
-            m_view->contentsRect().height() - 2 * m_padding_topbottom
-    };
+            m_view->contentsRect().height() - 2 * m_padding_topbottom};
 }
 void PageView::go_next() {
-    m_index++;
-    if (m_index == m_filelist.size()) m_index = 0;
-    m_pixmap = QPixmap::fromImage(QImage(m_filelist[m_index].absoluteFilePath()));
+    qDebug() << __PRETTY_FUNCTION__;
+    int page = d->page_cur;
+    page++;
+    if (page == m_pages.size()) page = 0;
+    load_page(page);
+    return;
+    // m_pixmap = QPixmap::fromImage(QImage(m_pages[d->page_cur]));
+    // m_pixmap
+    auto [xres, yres] = make_pair(72, 72);
+    auto img = m_pages[d->page_cur]->renderToImage(xres, yres, 0, 0, this->width(),
+                                                   this->height());
+    m_pixmap = QPixmap::fromImage(img);
     m_photoItem->setImage(m_pixmap);
     assert(!m_pixmap.isNull());
 }
 
 void PageView::go_prev() {
-    m_index--;
-    if (m_index == -1) m_index = m_filelist.size() - 1;
-    m_pixmap = QPixmap::fromImage(QImage(m_filelist[m_index].absoluteFilePath()));
+    int page = d->page_cur;
+    page--;
+    if (page == -1) page = d->page_max;
+    load_page(page);
+    return;
+    m_pixmap = QPixmap::fromImage(QImage(m_filelist[d->page_cur].absoluteFilePath()));
     m_photoItem->setImage(m_pixmap);
     assert(!m_pixmap.isNull());
 }
-class PageView::Private {
-public:
-    int page_cur;
-    double scale;
-    int page_max; //[0, pagemax] 0-based.
-    QStringList words_page_all;  // all words in current page.
-    WordItemMap wordItems_in_page;
-    std::shared_ptr<SqlSave> wordstore{nullptr};
-
-    QTransform normalizedTransform;
-
-    std::shared_ptr<Poppler::Page> pdfpage{nullptr};
-    QSizeF pageSize;
-};
 
 void PageView::go_to(int n) {
-
     int page_max = d->page_max;
     int pageno = n;
     if (pageno < 0) pageno = 0;
@@ -202,13 +215,13 @@ QStringList PageView::words_forCurPage() {
     QSet<QString> words_cache;
     QString carried;
     d->wordItems_in_page.values();
-    for(auto &i: d->wordItems_in_page.values()){
+    for (auto &i : d->wordItems_in_page.values()) {
         delete i;
     }
     d->wordItems_in_page.clear();
     for (auto i = tx.begin(); i < tx.end(); i++) {
         auto cur = (*i)->text();
-        if(cur.size() > 1 and cur[0].isUpper() and cur[1].isUpper()){
+        if (cur.size() > 1 and cur[0].isUpper() and cur[1].isUpper()) {
             cur = cur.simplified();
         }
         if (auto res = getWord(carried, cur); res.isEmpty()) {
@@ -246,13 +259,17 @@ QStringList PageView::words_forCurPage() {
             x->highlight = {anno_region};
             d->wordItems_in_page[cur] = x;
         }
-
     }
     return res;
 }
 
 void PageView::load_page(int n) {
-
+    qDebug() << __PRETTY_FUNCTION__;
+    qDebug() << "want load:" << n;
+    if (d->page_cur == n) {
+        qDebug() << "same page.";
+        return;
+    }
     assert(d->page_cur != n);
     // 1. before swtich page, release load for current page.
     for (auto i : d->wordItems_in_page.keys()) {
@@ -271,9 +288,10 @@ void PageView::load_page(int n) {
 
     // 2. load new page, directly from the qpoppler, draw it for display.
     d->page_cur = n;
+    qDebug() << "page size:" << m_pages.size();
     // d->edit_setPage->setText(QString("%1").arg(d->page_cur + 1));
     // d->pdfpage = d->document->page(d->page_cur);
-    d->pdfpage = std::unique_ptr<Poppler::Page>(m_pages[d->page_cur]);
+    d->pdfpage = std::unique_ptr<Poppler::Page>(d->document->page(d->page_cur));
     d->pageSize = d->pdfpage->pageSizeF();
     d->normalizedTransform.reset();
     d->normalizedTransform.scale(d->pageSize.width(), d->pageSize.height());
@@ -338,7 +356,6 @@ QStringList PageView::check_wordlevel(const QStringList &wordlist) {
 
 void PageView::update_filter() { check_wordlevel(d->words_page_all); }
 void PageView::update_image() {
-
     // FIXME: compile fail. even with `CONFIG += C++20`
     // cout << std::format("renderToImage parameters: width:{}", width)<<endl;
 
@@ -347,12 +364,39 @@ void PageView::update_image() {
     // qDebug() << "y :" << this->physicalDpiY();
     // auto [xres, yres] = make_pair(this->physicalDpiY() * d->scale, this->physicalDpiY()
     // * d->scale);
-    auto [xres, yres] = make_pair(72, 72);
-    auto page_view_size = d->pageSize * d->scale;
 
-    auto image =
-        d->pdfpage->renderToImage(d->scale * xres, d->scale * yres, 0, 0,
-                                  page_view_size.width(), page_view_size.height());
-    //d->label->setPixmap(QPixmap::fromImage(image));
+    // auto [xres, yres] = make_pair(72, 72);
+    // auto page_view_size = d->pageSize * d->scale;
+
+    // auto image =
+    //     d->pdfpage->renderToImage(d->scale * xres, d->scale * yres, 0, 0,
+    //                               page_view_size.width(), page_view_size.height());
+    auto [xres, yres] = make_pair(72, 72);
+    // auto pagesize = m_pages[d->page_cur]->pageSize();
+    m_scale = m_photoItem->getScale();
+    auto cursize = m_pages[d->page_cur]->pageSize() * m_scale;
+    auto img = m_pages[d->page_cur]->renderToImage(m_scale * xres, m_scale * yres, 0, 0,
+                                                   cursize.width(), cursize.height());
+    qDebug() << QString("render params: %1, %2, %3, %4, sacle %5")
+                    .arg(m_scale * xres)
+                    .arg(m_scale * yres)
+                    .arg(cursize.width())
+                    .arg(cursize.height())
+                    .arg(m_scale);
+
+    m_pixmap = QPixmap::fromImage(img);
+    m_photoItem->setImage(m_pixmap);
+    m_photoItem->update();
+    // d->label->setPixmap(QPixmap::fromImage(image));
 }
 
+void PageView::scale_bigger() {}
+
+void PageView::scale_smaller() {}
+void PageView::load(Poppler::Document *docu) {
+    for (int i = 0; i < docu->numPages(); i++) {
+        m_pages.push_back(docu->page(i));
+    }
+    d->document = docu;
+    d->page_cur = 0;
+}

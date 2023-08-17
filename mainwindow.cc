@@ -105,6 +105,7 @@ class Mainwindow::Private {
     // gui
     QTextEdit *x{nullptr};
     PageContainer *page_continer{nullptr};
+    QLabel *label{nullptr};
     // QListWidget *listwidget{nullptr};
 
     WordlistWidget *wordwgt{nullptr};
@@ -173,10 +174,14 @@ Mainwindow::Mainwindow() {
     connect(this, &Mainwindow::PageLoadDone, d->wordwgt,
             &WordlistWidget::onPageLoadAfter);
     auto pageShower = new QWidget(this);
-    auto pageLay = new QVBoxLayout;
+    auto pageLay = new QHBoxLayout;
     {
         d->page_continer = new PageContainer(this);
+        d->label = new QLabel(this);
         pageLay->addWidget(d->page_continer);
+        pageLay->addWidget(d->label);
+        pageLay->setStretch(0, 1);
+        pageLay->setStretch(1, 1);
     }
 
     pageShower->setLayout(pageLay);
@@ -265,6 +270,7 @@ void Mainwindow::openFile(const QString &filename) {
     d->pagewidth = d->page_continer->width();
     // this function will only run once, update later.
     d->words_docu_all = words_forDocument();
+    d->page_continer->setDocument(d->document);
     test_load_outline();
     test_scan_annotations();
     this->go_to(0);
@@ -446,13 +452,13 @@ QStringList Mainwindow::words_forCurPage() {
     QSet<QString> words_cache;
     QString carried;
     d->wordItems_in_page.values();
-    for(auto &i: d->wordItems_in_page.values()){
+    for (auto &i : d->wordItems_in_page.values()) {
         delete i;
     }
     d->wordItems_in_page.clear();
     for (auto i = tx.begin(); i < tx.end(); i++) {
         auto cur = (*i)->text();
-        if(cur.size() > 1 and cur[0].isUpper() and cur[1].isUpper()){
+        if (cur.size() > 1 and cur[0].isUpper() and cur[1].isUpper()) {
             cur = cur.simplified();
         }
         if (auto res = getWord(carried, cur); res.isEmpty()) {
@@ -490,7 +496,6 @@ QStringList Mainwindow::words_forCurPage() {
             x->highlight = {anno_region};
             d->wordItems_in_page[cur] = x;
         }
-
     }
     return res;
 }
@@ -558,7 +563,13 @@ void Mainwindow::update_image() {
     auto image =
         d->pdfpage->renderToImage(d->scale * xres, d->scale * yres, 0, 0,
                                   page_view_size.width(), page_view_size.height());
-    d->page_continer->setPixmap(QPixmap::fromImage(image));
+    qDebug() << QString("render params :%1, %2, %3, %4.scale %5")
+                    .arg(d->scale * xres)
+                    .arg(d->scale * yres)
+                    .arg(page_view_size.width())
+                    .arg(page_view_size.height())
+                    .arg(d->scale);
+    d->label->setPixmap(QPixmap::fromImage(image));
 }
 void Mainwindow::test_scan_annotations() {
     for (int i = 0; i < d->document->numPages(); i++) {
@@ -570,7 +581,6 @@ void Mainwindow::test_scan_annotations() {
     }
 }
 void Mainwindow::load_settings() { d->scale = Settings::instance()->pageScale(); }
-
 
 void Mainwindow::test_load_outline() {
     auto outline = Outline();

@@ -67,14 +67,6 @@ WordlistWidget::WordlistWidget(QWidget *parent) : QWidget(parent) {
             connect(d->btn_showConciseWordOnly, &QPushButton::clicked, this,
                     &WordlistWidget::updateFilter);
         }
-
-        {
-            d->btn_scanscope = new QPushButton("Switch between doc-page", this);
-            lay->addWidget(d->btn_scanscope);
-
-            connect(d->btn_scanscope, &QPushButton::clicked, this,
-                    &WordlistWidget::updateFilter);
-        }
     }
     d->wordlistview = new QListView(this);
     lay->addWidget(d->wordlistview);

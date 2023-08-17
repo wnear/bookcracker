@@ -12,39 +12,36 @@ class PageView : public QWidget {
   public:
     PageView(QWidget *parent = nullptr);
 
-    //init
-    void load(Poppler::Document *docu) {
-        for (int i = 0; i < docu->numPages(); i++) {
-            m_pages.push_back(docu->page(i));
-        }
-    }
-    void setViewSize(){}
+    // init
+    void load(Poppler::Document *docu);
+    void setViewSize() {}
     QSize boardSize() const;
 
-
-    //scale
+    // scale
     void autoscale();
     void setScale(float incr);
-    void scaleToPageWidth(){}
-    void scaleToPageHeight(){}
-    void scaleToPageFit(){}
+    void scaleToPageWidth() {}
+    void scaleToPageHeight() {}
+    void scaleToPageFit() {}
 
     void displayInfo() const;
 
     void load_page(int n);
     void update_image();
 
-    //word.
+    // word.
     QStringList words_forCurPage();
     void update_filter();
     QStringList check_wordlevel(const QStringList &wordlist);
 
-    //highlight
+    // highlight
     Poppler::HighlightAnnotation *make_highlight(QRectF region);
 
-    //jump
+    // jump
     void go_next();
     void go_prev();
+    void scale_bigger();
+    void scale_smaller();
     void go_to(int n);
   signals:
     // NOTE: directConnection signal-slot <=> cb on event.

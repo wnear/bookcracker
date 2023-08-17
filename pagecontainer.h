@@ -11,6 +11,12 @@ class PageContainer : public QWidget {
 
     QWidget *focus();
 
+    void go_to(int n);
+    void go_next();
+    void go_prev();
+    void scale_bigger();
+    void scale_smaller();
+
   private:
     class Private;
     Private *d{nullptr};

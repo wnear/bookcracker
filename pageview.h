@@ -56,7 +56,6 @@ class PageView : public QWidget {
     PageItem *m_photoItem{nullptr};
 
     QList<Poppler::Page *> m_pages;  // TODO: optimi
-    QFileInfoList m_filelist{};
     int m_index{0};
     QPixmap m_pixmap;
 

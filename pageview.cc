@@ -86,8 +86,6 @@ PageView::PageView(QWidget *parent) : QWidget(parent) {
 
     m_photoItem = new PageItem;
     m_photoItem->setPos(0, 0);
-    m_filelist = QDir("/home/bill/Pictures").entryInfoList({"*.png", "*.jpg"});
-    // go_next();
 
     m_scene = new QGraphicsScene(0, 0, 400, 400);
     m_scene->addItem(m_photoItem);
@@ -167,44 +165,22 @@ QSize PageView::boardSize() const {
     return {m_view->contentsRect().width() - 2 * m_padding_leftright,
             m_view->contentsRect().height() - 2 * m_padding_topbottom};
 }
+
 void PageView::go_next() {
-    qDebug() << __PRETTY_FUNCTION__;
-    int page = d->page_cur;
-    page++;
-    if (page == m_pages.size()) page = 0;
-    load_page(page);
-    return;
-    // m_pixmap = QPixmap::fromImage(QImage(m_pages[d->page_cur]));
-    // m_pixmap
-    auto [xres, yres] = make_pair(72, 72);
-    auto img = m_pages[d->page_cur]->renderToImage(xres, yres, 0, 0, this->width(),
-                                                   this->height());
-    m_pixmap = QPixmap::fromImage(img);
-    m_photoItem->setImage(m_pixmap);
-    assert(!m_pixmap.isNull());
+    go_to(d->page_cur +1);
 }
 
 void PageView::go_prev() {
-    int page = d->page_cur;
-    page--;
-    if (page == -1) page = d->page_max;
-    load_page(page);
-    return;
-    m_pixmap = QPixmap::fromImage(QImage(m_filelist[d->page_cur].absoluteFilePath()));
-    m_photoItem->setImage(m_pixmap);
-    assert(!m_pixmap.isNull());
+    go_to(d->page_cur -1);
 }
 
 void PageView::go_to(int n) {
-    int page_max = d->page_max;
-    int pageno = n;
-    if (pageno < 0) pageno = 0;
-    if (pageno >= page_max) {
-        pageno = page_max - 1;
-    }
+    if(n == -1 || n == d->page_max)
+        return;
     // wont turn page.
-    if (pageno == d->page_cur) return;
-    this->load_page(pageno);
+    if (n == d->page_cur)
+        return;
+    this->load_page(n);
 }
 QStringList PageView::words_forCurPage() {
     auto tx = d->pdfpage->textList();
@@ -398,5 +374,7 @@ void PageView::load(Poppler::Document *docu) {
         m_pages.push_back(docu->page(i));
     }
     d->document = docu;
-    d->page_cur = 0;
+    d->page_cur = -1;
+    d->page_max = m_pages.size();
+    this->load_page(0);
 }

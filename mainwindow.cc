@@ -105,7 +105,6 @@ class Mainwindow::Private {
     // gui
     QTextEdit *x{nullptr};
     PageContainer *page_continer{nullptr};
-    QLabel *label{nullptr};
     // QListWidget *listwidget{nullptr};
 
     WordlistWidget *wordwgt{nullptr};
@@ -177,11 +176,8 @@ Mainwindow::Mainwindow() {
     auto pageLay = new QHBoxLayout;
     {
         d->page_continer = new PageContainer(this);
-        d->label = new QLabel(this);
         pageLay->addWidget(d->page_continer);
-        pageLay->addWidget(d->label);
         pageLay->setStretch(0, 1);
-        pageLay->setStretch(1, 1);
     }
 
     pageShower->setLayout(pageLay);
@@ -210,32 +206,32 @@ Mainwindow::Mainwindow() {
         toolbar_lay->addWidget(d->label_showpage_cur);
         connect(d->edit_setPage, &QLineEdit::returnPressed, this, [this]() {
             auto txt = d->edit_setPage->text();
-            this->go_to(txt.toInt() - 1);
+            // this->go_to(txt.toInt() - 1);
         });
 
         auto btn1 = new QToolButton(this);
         btn1->setIcon(QIcon::fromTheme("arrow-left"));
         btn1->setIconSize({32, 32});
         toolbar_lay->addWidget(btn1);
-        connect(btn1, &QAbstractButton::clicked, this, &Mainwindow::go_previous);
+        // connect(btn1, &QAbstractButton::clicked, this, &Mainwindow::go_previous);
 
         auto btn2 = new QToolButton(this);
         btn2->setIcon(QIcon::fromTheme("arrow-right"));
         btn2->setIconSize({32, 32});
         toolbar_lay->addWidget(btn2);
-        connect(btn2, &QAbstractButton::clicked, this, &Mainwindow::go_next);
+        // connect(btn2, &QAbstractButton::clicked, this, &Mainwindow::go_next);
 
         auto btn3 = new QToolButton(this);
         btn3->setIcon(QIcon::fromTheme("zoom-in"));
         btn3->setIconSize({32, 32});
         toolbar_lay->addWidget(btn3);
-        connect(btn3, &QAbstractButton::clicked, this, &Mainwindow::scale_bigger);
+        // connect(btn3, &QAbstractButton::clicked, this, &Mainwindow::scale_bigger);
 
         auto btn4 = new QToolButton(this);
         btn4->setIcon(QIcon::fromTheme("zoom-out"));
         btn4->setIconSize({32, 32});
         toolbar_lay->addWidget(btn4);
-        connect(btn4, &QAbstractButton::clicked, this, &Mainwindow::scale_smaller);
+        // connect(btn4, &QAbstractButton::clicked, this, &Mainwindow::scale_smaller);
 
         auto btn5 = new QPushButton("xx");
         btn5->setIconSize({32, 32});
@@ -273,29 +269,12 @@ void Mainwindow::openFile(const QString &filename) {
     d->page_continer->setDocument(d->document);
     test_load_outline();
     test_scan_annotations();
-    this->go_to(0);
 }
 Mainwindow::~Mainwindow() {
     delete d;
     d = nullptr;
     cout << __PRETTY_FUNCTION__ << endl;
 }
-
-void Mainwindow::go_to(int n) {
-    int page_max = this->d->document->numPages();
-    int page_cur = n;
-    if (page_cur < 0) page_cur = 0;
-    if (page_cur >= page_max) {
-        page_cur = page_max - 1;
-    }
-    // wont turn page.
-    if (page_cur == d->page_cur) return;
-    this->load_page(page_cur);
-}
-
-void Mainwindow::go_previous() { this->go_to(d->page_cur - 1); }
-
-void Mainwindow::go_next() { this->go_to(d->page_cur + 1); }
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 void Mainwindow::load_page(int n) {
@@ -361,74 +340,9 @@ void Mainwindow::load_page(int n) {
 }
 #else
 
-void Mainwindow::load_page(int n) {
-    assert(d->page_cur != n);
-    // 1. before swtich page, release load for current page.
-    for (auto i : d->wordItems_in_page.keys()) {
-        auto &hl = d->wordItems_in_page[i]->highlight;
-        for (auto i = hl.begin(); i != hl.end(); i++) {
-            if (i->second != nullptr) {
-                d->pdfpage->removeAnnotation(i->second);
-                i->second = nullptr;
-            }
-        }
-    }
-    emit pageLoadBefore();
-    d->wordItems_in_page.clear();
-    // d->wordwgt->update();
-    QCoreApplication::processEvents();
-
-    // 2. load new page, directly from the qpoppler, draw it for display.
-    d->page_cur = n;
-    d->edit_setPage->setText(QString("%1").arg(d->page_cur + 1));
-    // d->pdfpage = d->document->page(d->page_cur);
-    d->pdfpage = std::unique_ptr<Poppler::Page>(d->document->page(d->page_cur));
-    d->pageSize = d->pdfpage->pageSizeF();
-    d->normalizedTransform.reset();
-    d->normalizedTransform.scale(d->pageSize.width(), d->pageSize.height());
-    cout << "load page:" << n << endl;
-
-    update_image();
-
-    // 3. do heavy job after the load.
-    // calcualte the words after filter, and redraw.
-    // cout << "now have word: " << d->wordstruct_in_page.size()<<endl;
-    d->words_page_all = words_forCurPage();
-    update_filter();
-    for (auto i : d->wordItems_in_page.keys()) {
-        auto &hl = d->wordItems_in_page[i]->highlight;
-        auto is_visible = d->wordItems_in_page[i]->isVisible();
-        for (auto i = hl.begin(); i != hl.end(); i++) {
-            if (is_visible && i->second == nullptr) {
-                i->second = this->make_highlight(i->first);
-            }
-        }
-    }
-    // TODO: necessary? maybe for the selection state.
-    emit PageLoadDone();
-    update_image();
-}
 #endif
 
 void Mainwindow::setupBtns() {}
-void Mainwindow::scale_bigger() {
-    if (d->scale >= 5.0) {
-        return;
-    }
-    d->scale += 0.2;
-    Settings::instance()->setPageScale(d->scale);
-    update_image();
-}
-
-void Mainwindow::scale_smaller() {
-    if (d->scale <= 0.2) {
-        return;
-    }
-    d->scale -= 0.1;
-    Settings::instance()->setPageScale(d->scale);
-
-    update_image();
-}
 
 QStringList Mainwindow::check_wordlevel(const QStringList &wordlist) {
     QStringList res;
@@ -548,29 +462,6 @@ QStringList Mainwindow::words_forDocument() {
     return res;
 }
 
-void Mainwindow::update_image() {
-    // FIXME: compile fail. even with `CONFIG += C++20`
-    // cout << std::format("renderToImage parameters: width:{}", width)<<endl;
-
-    // qDebug() << QString("renderToImage parameters: width:%1").arg(width);
-    // qDebug() << "x :" << this->physicalDpiX();
-    // qDebug() << "y :" << this->physicalDpiY();
-    // auto [xres, yres] = make_pair(this->physicalDpiY() * d->scale, this->physicalDpiY()
-    // * d->scale);
-    auto [xres, yres] = make_pair(72, 72);
-    auto page_view_size = d->pageSize * d->scale;
-
-    auto image =
-        d->pdfpage->renderToImage(d->scale * xres, d->scale * yres, 0, 0,
-                                  page_view_size.width(), page_view_size.height());
-    qDebug() << QString("render params :%1, %2, %3, %4.scale %5")
-                    .arg(d->scale * xres)
-                    .arg(d->scale * yres)
-                    .arg(page_view_size.width())
-                    .arg(page_view_size.height())
-                    .arg(d->scale);
-    d->label->setPixmap(QPixmap::fromImage(image));
-}
 void Mainwindow::test_scan_annotations() {
     for (int i = 0; i < d->document->numPages(); i++) {
         auto page = d->document->page(i);

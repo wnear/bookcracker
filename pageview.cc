@@ -182,8 +182,35 @@ void PageView::go_to(int n) {
         return;
     this->load_page(n);
 }
+
+void display(Poppler::TextBox *tb){
+    QStringList words{};
+    QChar last(' ');
+    for(auto i: tb->text()){
+        if(i.isLetter()){
+            if(!last.isLetter()){
+                words.push_back({});
+            }
+            words.back().push_back(i);
+        }
+        last = i;
+    }
+    //{word, bounding.};
+    // qDebug()<<QString("%1 => %2").arg(tb->text()).arg(words.join(";"));
+    if(tb->text().back() == '.'){ // end of sentence.
+
+        qDebug()<<tb->text();
+    }
+
+
+}
+
 QStringList PageView::words_forCurPage() {
     auto tx = d->pdfpage->textList();
+    for (auto i = tx.begin(); i < tx.end(); i++) {
+        auto cur = (*i)->text();
+        display(*i);
+    }
 
     QStringList suffixes{"s", "es", "ed", "ing"};
 
@@ -268,6 +295,7 @@ void PageView::load_page(int n) {
     // d->edit_setPage->setText(QString("%1").arg(d->page_cur + 1));
     // d->pdfpage = d->document->page(d->page_cur);
     d->pdfpage = std::unique_ptr<Poppler::Page>(d->document->page(d->page_cur));
+    parse(d->pdfpage);
     d->pageSize = d->pdfpage->pageSizeF();
     d->normalizedTransform.reset();
     d->normalizedTransform.scale(d->pageSize.width(), d->pageSize.height());
@@ -291,7 +319,7 @@ void PageView::load_page(int n) {
     }
     // TODO: necessary? maybe for the selection state.
     emit PageLoadDone();
-    update_image();
+    // update_image();
 }
 
 Poppler::HighlightAnnotation *PageView::make_highlight(QRectF region) {
@@ -378,3 +406,5 @@ void PageView::load(Poppler::Document *docu) {
     d->page_max = m_pages.size();
     this->load_page(0);
 }
+void PageView::parse(std::shared_ptr<Poppler::Page> page) {}
+

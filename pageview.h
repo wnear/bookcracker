@@ -33,6 +33,7 @@ class PageView : public QWidget {
     QStringList words_forCurPage();
     void update_filter();
     QStringList check_wordlevel(const QStringList &wordlist);
+    void parse(std::shared_ptr<Poppler::Page> page);
 
     // highlight
     Poppler::HighlightAnnotation *make_highlight(QRectF region);

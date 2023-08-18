@@ -102,9 +102,7 @@ PageView::PageView(QWidget *parent) : QWidget(parent) {
     m_view->show();
     // NOTE: a little tricky,  wait for gui inited, then autoscale.
     QCoreApplication::processEvents();
-    m_photoItem->setBoardSize(boardSize());
-    m_photoItem->setBoardBackground(m_view->backgroundBrush().color());
-    m_photoItem->recalScale();
+    // m_photoItem->setBoardBackground(m_view->backgroundBrush().color());
     qDebug() << __LINE__;
     displayInfo();
 
@@ -127,10 +125,16 @@ PageView::PageView(QWidget *parent) : QWidget(parent) {
         connect(btn_previous, &QPushButton::clicked, this, &PageView::go_prev);
         connect(m_photoItem, &PageItem::photoChanged, this, &PageView::autoscale);
 
-        connect(btn_zoom_smaller, &QAbstractButton::clicked, this,
-                [this]() { m_view->scale(1.1, 1.1); });
-        connect(btn_zoom_bigger, &QAbstractButton::clicked, this,
-                [this]() { m_view->scale(0.9, 0.9); });
+        connect(btn_zoom_smaller, &QAbstractButton::clicked, this, [this]() {
+            m_item_sizescale -= 0.1;
+            m_item_sizescale = std::max<float>(0.3, m_item_sizescale);
+            update_image();
+        });
+        connect(btn_zoom_bigger, &QAbstractButton::clicked, this, [this]() {
+            m_item_sizescale += 0.1;
+            m_item_sizescale = std::min<float>(5, m_item_sizescale);
+            update_image();
+        });
     }
 
     this->layout()->addWidget(m_view);
@@ -142,14 +146,8 @@ void PageView::setScale(float incr) {
 }
 
 void PageView::autoscale() {
-    m_photoItem->setPos(0, 0);
     auto itemsize = m_photoItem->boundingRect();
-    auto s = m_photoItem->getScale();
     m_scene->setSceneRect(itemsize);
-    m_view->resetTransform();
-    m_view->scale(s, s);
-    m_scene->update();
-    m_photoItem->setBoardSize(boardSize());
 }
 
 void PageView::displayInfo() const {
@@ -166,22 +164,36 @@ QSize PageView::boardSize() const {
             m_view->contentsRect().height() - 2 * m_padding_topbottom};
 }
 
-void PageView::go_next() {
-    go_to(d->page_cur +1);
-}
+void PageView::go_next() { go_to(d->page_cur + 1); }
 
-void PageView::go_prev() {
-    go_to(d->page_cur -1);
-}
+void PageView::go_prev() { go_to(d->page_cur - 1); }
 
 void PageView::go_to(int n) {
-    if(n == -1 || n == d->page_max)
-        return;
+    if (n == -1 || n == d->page_max) return;
     // wont turn page.
-    if (n == d->page_cur)
-        return;
+    if (n == d->page_cur) return;
     this->load_page(n);
 }
+
+void display(Poppler::TextBox *tb) {
+    QStringList words{};
+    QChar last(' ');
+    for (auto i : tb->text()) {
+        if (i.isLetter()) {
+            if (!last.isLetter()) {
+                words.push_back({});
+            }
+            words.back().push_back(i);
+        }
+        last = i;
+    }
+    //{word, bounding.};
+    // qDebug()<<QString("%1 => %2").arg(tb->text()).arg(words.join(";"));
+    if (tb->text().back() == '.') {  // end of sentence.
+        // qDebug()<<tb->text();
+    }
+}
+
 QStringList PageView::words_forCurPage() {
     auto tx = d->pdfpage->textList();
 
@@ -335,30 +347,17 @@ void PageView::update_image() {
     // FIXME: compile fail. even with `CONFIG += C++20`
     // cout << std::format("renderToImage parameters: width:{}", width)<<endl;
 
-    // qDebug() << QString("renderToImage parameters: width:%1").arg(width);
-    // qDebug() << "x :" << this->physicalDpiX();
-    // qDebug() << "y :" << this->physicalDpiY();
-    // auto [xres, yres] = make_pair(this->physicalDpiY() * d->scale, this->physicalDpiY()
-    // * d->scale);
-
-    // auto [xres, yres] = make_pair(72, 72);
-    // auto page_view_size = d->pageSize * d->scale;
-
-    // auto image =
-    //     d->pdfpage->renderToImage(d->scale * xres, d->scale * yres, 0, 0,
-    //                               page_view_size.width(), page_view_size.height());
     auto [xres, yres] = make_pair(72, 72);
-    // auto pagesize = m_pages[d->page_cur]->pageSize();
-    m_scale = m_photoItem->getScale();
-    auto cursize = m_pages[d->page_cur]->pageSize() * m_scale;
-    auto img = m_pages[d->page_cur]->renderToImage(m_scale * xres, m_scale * yres, 0, 0,
+    auto scale = m_item_sizescale;
+    auto cursize = m_pages[d->page_cur]->pageSize() * scale;
+    auto img = m_pages[d->page_cur]->renderToImage(scale * xres, scale * yres, 0, 0,
                                                    cursize.width(), cursize.height());
     qDebug() << QString("render params: %1, %2, %3, %4, sacle %5")
-                    .arg(m_scale * xres)
-                    .arg(m_scale * yres)
+                    .arg(scale * xres)
+                    .arg(scale * yres)
                     .arg(cursize.width())
                     .arg(cursize.height())
-                    .arg(m_scale);
+                    .arg(scale);
 
     m_pixmap = QPixmap::fromImage(img);
     m_photoItem->setImage(m_pixmap);

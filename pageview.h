@@ -63,5 +63,6 @@ class PageView : public QWidget {
     int m_padding_topbottom = 8;
     int m_padding_leftright = 8;
     float m_scale = 1.0;
+    float m_item_sizescale = 2.0;
     const int m_padding = 0;
 };

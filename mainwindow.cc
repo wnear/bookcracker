@@ -10,6 +10,7 @@
 #include <format>
 #include <QThread>
 #include <QCoreApplication>
+#include "pagecontainer.h"
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 
@@ -103,14 +104,14 @@ class Mainwindow::Private {
 
     // gui
     QTextEdit *x{nullptr};
-    QLabel *label{nullptr};
+    PageContainer *page_continer{nullptr};
     // QListWidget *listwidget{nullptr};
 
     WordlistWidget *wordwgt{nullptr};
 
     // beware, it's 1-idnexed.
     QLineEdit *edit_setPage{nullptr};
-    QLabel *label_showPageNo{nullptr};
+    QLabel *label_showpage_cur{nullptr};
 
     // pdf dispay helper
     QTransform normalizedTransform;
@@ -118,12 +119,12 @@ class Mainwindow::Private {
 
     // pdf
     QString filename;
-    int pageno{0};
+    int page_cur{0};
     int pagewidth = -1;
 
     // #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
     std::shared_ptr<Poppler::Page> pdfpage{nullptr};
-    std::shared_ptr<Poppler::Document> document{nullptr};
+    Poppler::Document *document{nullptr};
     // #else
     //     Poppler::Page *pdfpage{nullptr};
     //     Poppler::Document *document{nullptr};
@@ -172,10 +173,11 @@ Mainwindow::Mainwindow() {
     connect(this, &Mainwindow::PageLoadDone, d->wordwgt,
             &WordlistWidget::onPageLoadAfter);
     auto pageShower = new QWidget(this);
-    auto pageLay = new QVBoxLayout;
+    auto pageLay = new QHBoxLayout;
     {
-        d->label = new QLabel(this);
-        pageLay->addWidget(d->label);
+        d->page_continer = new PageContainer(this);
+        pageLay->addWidget(d->page_continer);
+        pageLay->setStretch(0, 1);
     }
 
     pageShower->setLayout(pageLay);
@@ -200,36 +202,36 @@ Mainwindow::Mainwindow() {
         d->edit_setPage->setAlignment(Qt::AlignRight);
         toolbar_lay->addWidget(d->edit_setPage);
         // toolbar_lay->addWidget(new QLabel(" of "));
-        d->label_showPageNo = new QLabel(this);
-        toolbar_lay->addWidget(d->label_showPageNo);
+        d->label_showpage_cur = new QLabel(this);
+        toolbar_lay->addWidget(d->label_showpage_cur);
         connect(d->edit_setPage, &QLineEdit::returnPressed, this, [this]() {
             auto txt = d->edit_setPage->text();
-            this->go_to(txt.toInt() - 1);
+            // this->go_to(txt.toInt() - 1);
         });
 
         auto btn1 = new QToolButton(this);
         btn1->setIcon(QIcon::fromTheme("arrow-left"));
         btn1->setIconSize({32, 32});
         toolbar_lay->addWidget(btn1);
-        connect(btn1, &QAbstractButton::clicked, this, &Mainwindow::go_previous);
+        // connect(btn1, &QAbstractButton::clicked, this, &Mainwindow::go_previous);
 
         auto btn2 = new QToolButton(this);
         btn2->setIcon(QIcon::fromTheme("arrow-right"));
         btn2->setIconSize({32, 32});
         toolbar_lay->addWidget(btn2);
-        connect(btn2, &QAbstractButton::clicked, this, &Mainwindow::go_next);
+        // connect(btn2, &QAbstractButton::clicked, this, &Mainwindow::go_next);
 
         auto btn3 = new QToolButton(this);
         btn3->setIcon(QIcon::fromTheme("zoom-in"));
         btn3->setIconSize({32, 32});
         toolbar_lay->addWidget(btn3);
-        connect(btn3, &QAbstractButton::clicked, this, &Mainwindow::scale_bigger);
+        // connect(btn3, &QAbstractButton::clicked, this, &Mainwindow::scale_bigger);
 
         auto btn4 = new QToolButton(this);
         btn4->setIcon(QIcon::fromTheme("zoom-out"));
         btn4->setIconSize({32, 32});
         toolbar_lay->addWidget(btn4);
-        connect(btn4, &QAbstractButton::clicked, this, &Mainwindow::scale_smaller);
+        // connect(btn4, &QAbstractButton::clicked, this, &Mainwindow::scale_smaller);
 
         auto btn5 = new QPushButton("xx");
         btn5->setIconSize({32, 32});
@@ -252,21 +254,21 @@ void Mainwindow::openFile(const QString &filename) {
         cout << "load file fail, file not exist" << endl;
         return;
     }
+    d->document = Poppler::Document::load(filename);
 
-    d->document = std::unique_ptr<Poppler::Document>(Poppler::Document::load(filename));
-    d->label_showPageNo->setText(QString(" of %1").arg(d->document->numPages()));
+    d->label_showpage_cur->setText(QString(" of %1").arg(d->document->numPages()));
     d->edit_setPage->setValidator(new QIntValidator(1, d->document->numPages(), this));
     // cout <<"backend: "<< d->document->availableRenderBackends().size()<<endl;
     // cout << "backend: now"<< d->document->renderBackend() << endl;
     // d->document->setRenderBackend(Poppler::Document::QPainterBackend);
     d->document->setRenderHint(Poppler::Document::Antialiasing);
     d->document->setRenderHint(Poppler::Document::TextAntialiasing);
-    test_load_outline();
-    d->pagewidth = d->label->width();
+    d->pagewidth = d->page_continer->width();
     // this function will only run once, update later.
     d->words_docu_all = words_forDocument();
+    d->page_continer->setDocument(d->document);
+    test_load_outline();
     test_scan_annotations();
-    this->go_to(0);
 }
 Mainwindow::~Mainwindow() {
     delete d;
@@ -274,26 +276,10 @@ Mainwindow::~Mainwindow() {
     cout << __PRETTY_FUNCTION__ << endl;
 }
 
-void Mainwindow::go_to(int n) {
-    int page_max = this->d->document->numPages();
-    int pageno = n;
-    if (pageno < 0) pageno = 0;
-    if (pageno >= page_max) {
-        pageno = page_max - 1;
-    }
-    // wont turn page.
-    if (pageno == d->pageno) return;
-    this->load_page(pageno);
-}
-
-void Mainwindow::go_previous() { this->go_to(d->pageno - 1); }
-
-void Mainwindow::go_next() { this->go_to(d->pageno + 1); }
-
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 void Mainwindow::load_page(int n) {
-    d->pageno = n;
-    d->pdfpage = d->document->page(d->pageno);
+    d->page_cur = n;
+    d->pdfpage = d->document->page(d->page_cur);
     cout << "load page:" << n << endl;
 
     d->words_page_all = words_forCurPage();
@@ -353,83 +339,10 @@ void Mainwindow::load_page(int n) {
     update_image();
 }
 #else
-void Mainwindow::load_page_before() {
-    for (auto i : d->wordItems_in_page.keys()) {
-        auto &hl = d->wordItems_in_page[i]->highlight;
-        for (auto i = hl.begin(); i != hl.end(); i++) {
-            if (i->second != nullptr) {
-                d->pdfpage->removeAnnotation(i->second);
-                i->second = nullptr;
-            }
-        }
-    }
-    emit pageLoadBefore();
-    d->wordItems_in_page.clear();
-    // d->wordwgt->update();
-    QCoreApplication::processEvents();
-}
 
-void Mainwindow::load_page_after() {
-    // cout << "now have word: " << d->wordstruct_in_page.size()<<endl;
-    d->words_page_all = words_forCurPage();
-    update_filter();
-    for (auto i : d->wordItems_in_page.keys()) {
-        auto &hl = d->wordItems_in_page[i]->highlight;
-        auto is_visible = d->wordItems_in_page[i]->isVisible();
-        for (auto i = hl.begin(); i != hl.end(); i++) {
-            if (is_visible && i->second == nullptr) {
-                i->second = this->make_highlight(i->first);
-            }
-        }
-    }
-    // TODO: necessary? maybe for the selection state.
-    emit PageLoadDone();
-    update_image();
-}
-
-void Mainwindow::load_page(int n) {
-    assert(d->pageno != n);
-
-    // 1. before swtich page, release load for current page.
-    load_page_before();
-
-    // 2. load new page, directly from the qpoppler, draw it for display.
-    d->pageno = n;
-    d->edit_setPage->setText(QString("%1").arg(d->pageno + 1));
-    // d->pdfpage = d->document->page(d->pageno);
-    d->pdfpage = std::unique_ptr<Poppler::Page>(d->document->page(d->pageno));
-    d->pageSize = d->pdfpage->pageSizeF();
-    d->normalizedTransform.reset();
-    d->normalizedTransform.scale(d->pageSize.width(), d->pageSize.height());
-    cout << "load page:" << n << endl;
-
-    update_image();
-
-    // 3. do heavy job after the load.
-    // calcualte the words after filter, and redraw.
-    load_page_after();
-}
 #endif
 
 void Mainwindow::setupBtns() {}
-void Mainwindow::scale_bigger() {
-    if (d->scale >= 5.0) {
-        return;
-    }
-    d->scale += 0.2;
-    Settings::instance()->setPageScale(d->scale);
-    update_image();
-}
-
-void Mainwindow::scale_smaller() {
-    if (d->scale <= 0.2) {
-        return;
-    }
-    d->scale -= 0.1;
-    Settings::instance()->setPageScale(d->scale);
-
-    update_image();
-}
 
 QStringList Mainwindow::check_wordlevel(const QStringList &wordlist) {
     QStringList res;
@@ -453,13 +366,13 @@ QStringList Mainwindow::words_forCurPage() {
     QSet<QString> words_cache;
     QString carried;
     d->wordItems_in_page.values();
-    for(auto &i: d->wordItems_in_page.values()){
+    for (auto &i : d->wordItems_in_page.values()) {
         delete i;
     }
     d->wordItems_in_page.clear();
     for (auto i = tx.begin(); i < tx.end(); i++) {
         auto cur = (*i)->text();
-        if(cur.size() > 1 and cur[0].isUpper() and cur[1].isUpper()){
+        if (cur.size() > 1 and cur[0].isUpper() and cur[1].isUpper()) {
             cur = cur.simplified();
         }
         if (auto res = getWord(carried, cur); res.isEmpty()) {
@@ -490,14 +403,13 @@ QStringList Mainwindow::words_forCurPage() {
             WordItem *x = new WordItem;
             x->original = cur;
             x->content = cur;
-            x->id = make_pair(d->pageno, std::distance(i, tx.begin()));
-            x->id_page = d->pageno;
+            x->id = make_pair(d->page_cur, std::distance(i, tx.begin()));
+            x->id_page = d->page_cur;
             x->id_idx = std::distance(i, tx.begin());
             // x.boundingbox = (*i)->boundingBox();
             x->highlight = {anno_region};
             d->wordItems_in_page[cur] = x;
         }
-
     }
     return res;
 }
@@ -509,7 +421,7 @@ bool findword(c_t c, QString &word) {
 }
 
 QStringList Mainwindow::words_forDocument() {
-    // auto pagex = d->pageno;
+    // auto pagex = d->page_cur;
     QStringList suffixes{"s", "es", "ed", "ing"};
     QStringList res;
     QSet<QString> words_cache;
@@ -550,23 +462,6 @@ QStringList Mainwindow::words_forDocument() {
     return res;
 }
 
-void Mainwindow::update_image() {
-    // FIXME: compile fail. even with `CONFIG += C++20`
-    // cout << std::format("renderToImage parameters: width:{}", width)<<endl;
-
-    // qDebug() << QString("renderToImage parameters: width:%1").arg(width);
-    // qDebug() << "x :" << this->physicalDpiX();
-    // qDebug() << "y :" << this->physicalDpiY();
-    // auto [xres, yres] = make_pair(this->physicalDpiY() * d->scale, this->physicalDpiY()
-    // * d->scale);
-    auto [xres, yres] = make_pair(72, 72);
-    auto page_view_size = d->pageSize * d->scale;
-
-    auto image =
-        d->pdfpage->renderToImage(d->scale * xres, d->scale * yres, 0, 0,
-                                  page_view_size.width(), page_view_size.height());
-    d->label->setPixmap(QPixmap::fromImage(image));
-}
 void Mainwindow::test_scan_annotations() {
     for (int i = 0; i < d->document->numPages(); i++) {
         auto page = d->document->page(i);
@@ -578,12 +473,8 @@ void Mainwindow::test_scan_annotations() {
 }
 void Mainwindow::load_settings() { d->scale = Settings::instance()->pageScale(); }
 
-
 void Mainwindow::test_load_outline() {
     auto outline = Outline();
-    //FIXME: d->dcument, plain pointer to shared_ptr,
-    //sigsegv.
-    return;
     outline.setDocument(d->document);
     outline.load_outlie();
     outline.display_outline();

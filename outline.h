@@ -8,6 +8,7 @@
 struct Position;
 struct Section;
 using Outline_t = std::vector<Section>;
+using document_t = Poppler::Document;
 
 struct Position {
     QString urlOrFilename;
@@ -24,12 +25,16 @@ struct Section {
 
 class Outline {
   public:
-    void setDocument(std::shared_ptr<Poppler::Document> doc);
+    Outline();
+    void setDocument(document_t* doc);
 
     void load_outlie();
     void display_outline();
+    ~Outline(){
+
+    }
 
   private:
     class Private;
-    Private *d;
+    Private *d{nullptr};
 };

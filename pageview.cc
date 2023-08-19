@@ -196,10 +196,6 @@ void display(Poppler::TextBox *tb) {
 
 QStringList PageView::words_forCurPage() {
     auto tx = d->pdfpage->textList();
-    for (auto i = tx.begin(); i < tx.end(); i++) {
-        auto cur = (*i)->text();
-        display(*i);
-    }
 
     QStringList suffixes{"s", "es", "ed", "ing"};
 
@@ -284,7 +280,6 @@ void PageView::load_page(int n) {
     // d->edit_setPage->setText(QString("%1").arg(d->page_cur + 1));
     // d->pdfpage = d->document->page(d->page_cur);
     d->pdfpage = std::unique_ptr<Poppler::Page>(d->document->page(d->page_cur));
-    parse(d->pdfpage);
     d->pageSize = d->pdfpage->pageSizeF();
     d->normalizedTransform.reset();
     d->normalizedTransform.scale(d->pageSize.width(), d->pageSize.height());
@@ -382,4 +377,3 @@ void PageView::load(Poppler::Document *docu) {
     d->page_max = m_pages.size();
     this->load_page(0);
 }
-void PageView::parse(std::shared_ptr<Poppler::Page> page) {}

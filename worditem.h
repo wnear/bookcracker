@@ -46,6 +46,7 @@ struct WordItem {
     QString context_sentence;
 
     QVector<std::pair<QRectF, Poppler::HighlightAnnotation*>> highlight;
+    QStringList sentences{};
     std::pair<int, int> id;  // page-number.
     int id_page;
     int id_idx;

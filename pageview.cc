@@ -213,6 +213,19 @@ QList<std::pair<QString, QRectF>> display(Poppler::TextBox *tb) {
     return word_with_bounding;
 }
 
+bool PageView::near(Poppler::TextBox *l, Poppler::TextBox *r) {
+    auto dist_v = l->boundingBox().bottom() - r->boundingBox().bottom();
+    auto dist_h = l->boundingBox().bottom() - r->boundingBox().top();
+
+    if (dist_v == 0) {
+        return true;
+    } else {
+        bool res = dist_v / m_scale < 30;
+        if (res == false) qDebug() << "not near:" << dist_v << "," << m_scale;
+        return dist_v * m_scale < 10;
+    }
+}
+
 QStringList PageView::parsePage() {
     auto tx = d->pdfpage->textList();
     if (tx.isEmpty()) return {};
@@ -229,22 +242,47 @@ QStringList PageView::parsePage() {
     }
     // d->pdfpage->DontSaveAndRestore
     d->wordItems_in_page.clear();
-    QRectF last = tx[0]->boundingBox();
+
     sentence.push_back(tx[0]->text());
+
+    Poppler::TextBox *tb_last{nullptr}, *tb_cur{nullptr};
     for (auto i = tx.begin(); i < tx.end(); i++) {
         // check last push is line end.
-        sentence.push_back((*i)->text());
-
-        if (!(*i)->hasSpaceAfter()) {
-            // qDebug()<< (*i)->text();
-            // auto [cur, bounding] =
-            (*i)->nextWord();
+        if (tb_last == nullptr) {
+            tb_last = tb_cur = *i;
+        } else {
+            tb_cur = *i;
         }
-        last = (*i)->boundingBox();
+
+        if (tb_cur != tb_last) {
+            if (tb_cur->text().back() == '.' or (not near(tb_last, tb_cur))) {
+                sentence.push_back((*i)->text());
+                qDebug() << QString("sentence:%1").arg(sentence);
+                sentence.clear();
+            } else {
+                if (!sentence.isEmpty()) sentence.push_back(" ");
+                sentence.push_back((*i)->text());
+            }
+        }
+        tb_last = tb_cur;
+
+#if 0
+        //simple logic version of get sentence.
+        auto cur = *i;
+        auto next_tb = cur->nextWord();
+        if (next_tb == nullptr   // for eol and page end, next_tb will be nullptr.
+            or cur->text().back() == '.' ) {
+            qDebug()<<QString("sentence:%1").arg(sentence);
+            sentence.clear();
+        } else {
+            sentence.push_back(" ");
+        }
+#endif
+
         for (auto [cur, bounding] : display(*i)) {
             // auto cur = (*i)->text();
             if (cur.size() <= 1) continue;
-            if (cur.size() > 1 and cur[0].isUpper() and cur[1].isUpper()) {
+            if (cur.size() > 1 and cur[0].isUpper() and (not cur[1].isUpper())) {
                 cur = cur.simplified();
             }
             // if (auto res = getWord(carried, cur); res.isEmpty()) {
@@ -268,6 +306,7 @@ QStringList PageView::parsePage() {
             auto anno_region = make_pair(bounding, nullptr);
             if (contains) {
                 d->wordItems_in_page[cur]->highlight.push_back(anno_region);
+                d->wordItems_in_page[cur]->sentences.push_back(sentence);
             } else {
                 words_cache.insert(cur);
                 res.push_back(cur);
@@ -280,6 +319,7 @@ QStringList PageView::parsePage() {
                 x->id_idx = std::distance(i, tx.begin());
                 // x.boundingbox = (*i)->boundingBox();
                 x->highlight = {anno_region};
+                x->sentences.push_back(sentence);
                 d->wordItems_in_page[cur] = x;
             }
         }
@@ -374,8 +414,7 @@ void PageView::update_highlight(const QString &word) {
             d->pdfpage->removeAnnotation(i->second);
             i->second = nullptr;
         }
-        if(visible)
-            i->second = this->make_highlight(i->first, color);
+        if (visible) i->second = this->make_highlight(i->first, color);
     }
 }
 

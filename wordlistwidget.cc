@@ -52,22 +52,15 @@ WordlistWidget::WordlistWidget(QWidget *parent) : QWidget(parent) {
     // layout.
     auto lay = new QVBoxLayout;
     wordwgt->setLayout(lay);
-    {
-        {
-            d->btn_showdict = new QCheckBox("Show word in dict", this);
-            lay->addWidget(d->btn_showdict);
-            connect(d->btn_showdict, &QPushButton::clicked, this,
-                    &WordlistWidget::updateFilter);
-        }
+    d->btn_showdict = new QCheckBox("Show word in dict", this);
+    lay->addWidget(d->btn_showdict);
+    connect(d->btn_showdict, &QPushButton::clicked, this, &WordlistWidget::updateFilter);
 
-        {
-            d->btn_showConciseWordOnly = new QCheckBox("Show concise word only", this);
+    d->btn_showConciseWordOnly = new QCheckBox("Show concise word only", this);
 
-            lay->addWidget(d->btn_showConciseWordOnly);
-            connect(d->btn_showConciseWordOnly, &QPushButton::clicked, this,
-                    &WordlistWidget::updateFilter);
-        }
-    }
+    lay->addWidget(d->btn_showConciseWordOnly);
+    connect(d->btn_showConciseWordOnly, &QPushButton::clicked, this,
+            &WordlistWidget::updateFilter);
     d->wordlistview = new QListView(this);
     lay->addWidget(d->wordlistview);
 

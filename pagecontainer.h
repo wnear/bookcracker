@@ -2,6 +2,7 @@
 
 #include <QWidget>
 #include <poppler-qt5.h>
+#include "pageview.h"
 
 class PageContainer : public QWidget {
   public:
@@ -9,7 +10,7 @@ class PageContainer : public QWidget {
 
     void setDocument(Poppler::Document *doc);
 
-    QWidget *focus();
+    PageView *focus();
 
     void go_to(int n);
     void go_next();

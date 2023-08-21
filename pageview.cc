@@ -402,3 +402,7 @@ void PageView::load(Poppler::Document *docu) {
     d->page_max = m_pages.size();
     this->load_page(0);
 }
+WordItemMap *PageView::getWordItems() {
+    return &(d->wordItems_in_page);
+}
+

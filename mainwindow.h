@@ -4,19 +4,18 @@
 
 #include "outline.h"
 
-
 class Mainwindow : public QMainWindow {
     Q_OBJECT
   public:
     Mainwindow();
     ~Mainwindow();
 
-    void setupToolbar();
+    QWidget *setupToolbar();
 
     void openFile(const QString &filename);
 
   signals:
-    //NOTE: directConnection signal-slot <=> cb on event.
+    // NOTE: directConnection signal-slot <=> cb on event.
     void pageLoadBefore();
     void PageLoadDone();
 

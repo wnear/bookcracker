@@ -5,6 +5,7 @@
 #include <QFileInfo>
 
 #include "pageitem.h"
+#include "worditem.h"
 #include <poppler-qt5.h>
 
 class PageView : public QWidget {
@@ -24,6 +25,7 @@ class PageView : public QWidget {
     void scaleToPageHeight() {}
     void scaleToPageFit() {}
 
+
     void displayInfo() const;
 
     void load_page(int n);
@@ -33,6 +35,7 @@ class PageView : public QWidget {
     QStringList parsePage();
     void update_filter();
     QStringList check_wordlevel();
+    WordItemMap *getWordItems();
 
     // highlight
     Poppler::HighlightAnnotation *make_highlight(QRectF region);

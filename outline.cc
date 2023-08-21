@@ -45,20 +45,21 @@ void Outline::load_outlie() {
     }
 }
 
-void display_section_cur(const Section &sect, int depth = 0) {
+void display_section_recur(const Section &sect, int depth = 0) {
+    return;
     for (int i = 0; i < depth; i++) cout << "    ";  // use indent as layer indicator.
-    qDebug() << QString("level %1 %2 at page %3")
+    qDebug() << QString("page %3, l%1: %2")
                     .arg(depth)
                     .arg(sect.title)
                     .arg(sect.link.page);
     for (auto sub : sect.children) {
-        display_section_cur(sub, depth + 1);
+        display_section_recur(sub, depth + 1);
     }
 }
 
 void Outline::display_outline() {
     for (auto sec : d->outline) {
-        display_section_cur(sec);
+        display_section_recur(sec);
     }
 }
 void Outline::setDocument(document_t * doc) {

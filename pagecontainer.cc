@@ -42,3 +42,7 @@ void PageContainer::scale_bigger() {}
 
 void PageContainer::scale_smaller() {}
 
+PageView *PageContainer::focus() {
+    return d->view;
+}
+

@@ -66,9 +66,9 @@ class PageView::Private {
   public:
     int page_cur{-1};
     double scale;
-    int page_max;                //[0, pagemax] 0-based.
-    QStringList words_page_all;  // all words in current page.
+    int page_max;  //[0, pagemax] 0-based.
     WordItemMap wordItems_in_page;
+    QList<Poppler::HighlightAnnotation *> annos;
     std::shared_ptr<SqlSave> wordstore{nullptr};
 
     Poppler::Document *document;
@@ -116,11 +116,13 @@ PageView::PageView(QWidget *parent) : QWidget(parent) {
         auto btn_previous = new QPushButton("prev");
         auto btn_zoom_smaller = new QPushButton("zoom-in");
         auto btn_zoom_bigger = new QPushButton("zoom-out");
+        auto btn_test = new QPushButton("test");
 
         lay->addWidget(btn_next);
         lay->addWidget(btn_previous);
         lay->addWidget(btn_zoom_smaller);
         lay->addWidget(btn_zoom_bigger);
+        lay->addWidget(btn_test);
         connect(btn_next, &QPushButton::clicked, this, &PageView::go_next);
         connect(btn_previous, &QPushButton::clicked, this, &PageView::go_prev);
         connect(m_photoItem, &PageItem::photoChanged, this, &PageView::autoscale);
@@ -133,6 +135,17 @@ PageView::PageView(QWidget *parent) : QWidget(parent) {
         connect(btn_zoom_bigger, &QAbstractButton::clicked, this, [this]() {
             m_item_sizescale += 0.1;
             m_item_sizescale = std::min<float>(5, m_item_sizescale);
+            update_image();
+        });
+        connect(btn_test, &QAbstractButton::clicked, this, [this]() {
+            for (auto w : d->annos) {
+                if (w) {
+                    qDebug() << "remove anno.";
+                    d->pdfpage->removeAnnotation(w);
+                    w = nullptr;
+                }
+            }
+            d->annos.clear();
             update_image();
         });
     }
@@ -175,29 +188,37 @@ void PageView::go_to(int n) {
     this->load_page(n);
 }
 
-void display(Poppler::TextBox *tb) {
-    QStringList words{};
+QList<std::pair<QString, QRectF>> display(Poppler::TextBox *tb) {
+    QList<std::pair<QString, QRectF>> word_with_bounding;
+    word_with_bounding.push_back({{}, {}});
+    QString orig = tb->text();
     QChar last(' ');
-    for (auto i : tb->text()) {
-        if (i.isLetter()) {
+    for (int i = 0; i < tb->text().size(); i++) {
+        if (orig[i].isLetter()) {
             if (!last.isLetter()) {
-                words.push_back({});
+                word_with_bounding.push_back({{}, {}});
+                // words.push_back({});
             }
-            words.back().push_back(i);
+            word_with_bounding.back().first.push_back(orig[i]);
+            word_with_bounding.back().second |= tb->charBoundingBox(i);
+            // words.back().push_back(i);
         }
-        last = i;
+        last = orig[i];
     }
-    //{word, bounding.};
-    // qDebug()<<QString("%1 => %2").arg(tb->text()).arg(words.join(";"));
     if (tb->text().back() == '.') {  // end of sentence.
-        // qDebug()<<tb->text();
     }
+    for (auto [k, bd] : word_with_bounding) {
+        // qDebug()<<k;
+    }
+    return word_with_bounding;
 }
 
-QStringList PageView::words_forCurPage() {
+QStringList PageView::parsePage() {
     auto tx = d->pdfpage->textList();
-
+    if (tx.isEmpty()) return {};
     QStringList suffixes{"s", "es", "ed", "ing"};
+
+    QString sentence;
 
     QStringList res;
     QSet<QString> words_cache;
@@ -206,46 +227,61 @@ QStringList PageView::words_forCurPage() {
     for (auto &i : d->wordItems_in_page.values()) {
         delete i;
     }
+    // d->pdfpage->DontSaveAndRestore
     d->wordItems_in_page.clear();
+    QRectF last = tx[0]->boundingBox();
+    sentence.push_back(tx[0]->text());
     for (auto i = tx.begin(); i < tx.end(); i++) {
-        auto cur = (*i)->text();
-        if (cur.size() > 1 and cur[0].isUpper() and cur[1].isUpper()) {
-            cur = cur.simplified();
-        }
-        if (auto res = getWord(carried, cur); res.isEmpty()) {
-            continue;
-        } else {
-            cur = res;
-        }
+        // check last push is line end.
+        sentence.push_back((*i)->text());
 
-        bool contains = true;
-        do {
-            if (words_cache.contains(cur)) break;
-            // if (cur[0].isUpper()) {
-            //     for (auto &c : cur) {
-            //         c = c.toLower();
-            //     }
-            //     if (words_cache.contains(cur)) break;
+        if (!(*i)->hasSpaceAfter()) {
+            // qDebug()<< (*i)->text();
+            // auto [cur, bounding] =
+            (*i)->nextWord();
+        }
+        last = (*i)->boundingBox();
+        for (auto [cur, bounding] : display(*i)) {
+            // auto cur = (*i)->text();
+            if (cur.size() <= 1) continue;
+            if (cur.size() > 1 and cur[0].isUpper() and cur[1].isUpper()) {
+                cur = cur.simplified();
+            }
+            // if (auto res = getWord(carried, cur); res.isEmpty()) {
+            //     continue;
+            // } else {
+            //     cur = res;
             // }
-            if (cur[0].isDigit()) break;
-            contains = false;
-        } while (0);
-        auto anno_region = make_pair((*i)->boundingBox(), nullptr);
-        if (contains) {
-            d->wordItems_in_page[cur]->highlight.push_back(anno_region);
-        } else {
-            words_cache.insert(cur);
-            res.push_back(cur);
 
-            WordItem *x = new WordItem;
-            x->original = cur;
-            x->content = cur;
-            x->id = make_pair(d->page_cur, std::distance(i, tx.begin()));
-            x->id_page = d->page_cur;
-            x->id_idx = std::distance(i, tx.begin());
-            // x.boundingbox = (*i)->boundingBox();
-            x->highlight = {anno_region};
-            d->wordItems_in_page[cur] = x;
+            bool contains = true;
+            do {
+                if (words_cache.contains(cur)) break;
+                // if (cur[0].isUpper()) {
+                //     for (auto &c : cur) {
+                //         c = c.toLower();
+                //     }
+                //     if (words_cache.contains(cur)) break;
+                // }
+                if (cur[0].isDigit()) break;
+                contains = false;
+            } while (0);
+            auto anno_region = make_pair(bounding, nullptr);
+            if (contains) {
+                d->wordItems_in_page[cur]->highlight.push_back(anno_region);
+            } else {
+                words_cache.insert(cur);
+                res.push_back(cur);
+
+                WordItem *x = new WordItem;
+                x->original = cur;
+                x->content = cur;
+                x->id = make_pair(d->page_cur, std::distance(i, tx.begin()));
+                x->id_page = d->page_cur;
+                x->id_idx = std::distance(i, tx.begin());
+                // x.boundingbox = (*i)->boundingBox();
+                x->highlight = {anno_region};
+                d->wordItems_in_page[cur] = x;
+            }
         }
     }
     return res;
@@ -290,23 +326,18 @@ void PageView::load_page(int n) {
     // 3. do heavy job after the load.
     // calcualte the words after filter, and redraw.
     // cout << "now have word: " << d->wordstruct_in_page.size()<<endl;
-    d->words_page_all = words_forCurPage();
+    parsePage();
     update_filter();
     for (auto i : d->wordItems_in_page.keys()) {
-        auto &hl = d->wordItems_in_page[i]->highlight;
-        auto is_visible = d->wordItems_in_page[i]->isVisible();
-        for (auto i = hl.begin(); i != hl.end(); i++) {
-            if (is_visible && i->second == nullptr) {
-                i->second = this->make_highlight(i->first);
-            }
-        }
+        update_highlight(i);
     }
     // TODO: necessary? maybe for the selection state.
     emit PageLoadDone();
     update_image();
 }
 
-Poppler::HighlightAnnotation *PageView::make_highlight(QRectF region) {
+Poppler::HighlightAnnotation *PageView::make_highlight(QRectF region,
+                                                       const QColor &color) {
     auto boundary = d->normalizedTransform.inverted().mapRect(region);
     QList<Poppler::HighlightAnnotation::Quad> quads;
     {
@@ -319,19 +350,43 @@ Poppler::HighlightAnnotation *PageView::make_highlight(QRectF region) {
     }
 
     Poppler::Annotation::Style styl;
-    styl.setColor(Qt::red);
+    styl.setColor(color);
     styl.setOpacity(0.5);
 
-    auto myann = new Poppler::HighlightAnnotation;
+    auto *myann = new Poppler::HighlightAnnotation;
     // myann->setHighlightType(Poppler::HighlightAnnotation::Underline);
     myann->setHighlightQuads(quads);
     myann->setBoundary(boundary);
 
     myann->setStyle(styl);
     d->pdfpage->addAnnotation(myann);
+    d->annos.push_back(myann);
     return myann;
 }
-QStringList PageView::check_wordlevel(const QStringList &wordlist) {
+
+void PageView::update_highlight(const QString &word) {
+    auto *item = d->wordItems_in_page[word];
+    auto color = item->wordlevel == LEVEL_UNKOWN ? Qt::red : Qt::blue;
+    auto &hl = item->highlight;
+    auto visible = item->isVisible();
+    for (auto i = hl.begin(); i != hl.end(); i++) {
+        if (i->second != nullptr) {
+            d->pdfpage->removeAnnotation(i->second);
+            i->second = nullptr;
+        }
+        if(visible)
+            i->second = this->make_highlight(i->first, color);
+    }
+}
+
+void PageView::update_highlight(QStringList words) {
+    for (auto w : words) {
+        update_highlight(w);
+    }
+    update_image();
+}
+
+QStringList PageView::check_wordlevel() {
     QStringList res;
     for (auto word : d->wordItems_in_page.keys()) {
         auto lv = d->wordstore->getWordLevel(word);
@@ -342,7 +397,7 @@ QStringList PageView::check_wordlevel(const QStringList &wordlist) {
     return {};
 }
 
-void PageView::update_filter() { check_wordlevel(d->words_page_all); }
+void PageView::update_filter() { check_wordlevel(); }
 void PageView::update_image() {
     // FIXME: compile fail. even with `CONFIG += C++20`
     // cout << std::format("renderToImage parameters: width:{}", width)<<endl;
@@ -377,3 +432,4 @@ void PageView::load(Poppler::Document *docu) {
     d->page_max = m_pages.size();
     this->load_page(0);
 }
+WordItemMap *PageView::getWordItems() { return &(d->wordItems_in_page); }

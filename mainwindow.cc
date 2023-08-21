@@ -150,15 +150,6 @@ Mainwindow::Mainwindow() {
     load_settings();
     this->resize(100, 100);
 
-    connect(d->wordwgt, &WordlistWidget::markItemsLevel, this,
-            [this](QStringList words, wordlevel_t lv) {
-                qDebug() << "mainwindow thread: " << QThread::currentThreadId();
-                // qDebug() << "mark size: " << items.size();
-                for (auto &i : words) {
-                    qDebug() << "mark to x, with: " << i;
-                    d->wordItems_in_page[i]->wordlevel = lv;
-                }
-            });
     connect(d->page_continer->focus(), &PageView::pageLoadBefore, d->wordwgt,
             &WordlistWidget::onPageLoadBefore);
     connect(d->page_continer->focus(), &PageView::PageLoadDone, d->wordwgt,

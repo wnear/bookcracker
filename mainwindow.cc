@@ -100,50 +100,23 @@ void removeSeletedRowsFromView(QAbstractItemView *view) {
 class Mainwindow::Private {
   public:
     // settings
-    double scale = 2.5;
-
-    // gui
-    QTextEdit *x{nullptr};
-    PageContainer *page_continer{nullptr};
-    // QListWidget *listwidget{nullptr};
-
-    WordlistWidget *wordwgt{nullptr};
+    Poppler::Document *document{nullptr};
 
     // beware, it's 1-idnexed.
     QLineEdit *edit_setPage{nullptr};
     QLabel *label_showpage_cur{nullptr};
 
-    // pdf dispay helper
-    QTransform normalizedTransform;
-    QSizeF pageSize;
+    // gui
+    PageContainer *page_continer{nullptr};
+    WordlistWidget *wordwgt{nullptr};
 
-    // pdf
-    QString filename;
-    int page_cur{0};
-    int pagewidth = -1;
 
-    // #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-    std::shared_ptr<Poppler::Page> pdfpage{nullptr};
-    Poppler::Document *document{nullptr};
-    // #else
-    //     Poppler::Page *pdfpage{nullptr};
-    //     Poppler::Document *document{nullptr};
-    // #endif
-
-    std::shared_ptr<SqlSave> wordstore{nullptr};
-    // data, should be consistent.
-
-    QStringList words_page_all;  // all words in current page.
+    std::shared_ptr<SqlSave> wordstore{nullptr}; // data, should be consistent.
     WordItemMap wordItems_in_page;
-
     QStringList words_docu_all;          // all words in current page.
-    QStringList words_docu_afterFilter;  // after filter.
-    //
-    bool scopeIsPage{true};
 
     ~Private() {
         cout << __PRETTY_FUNCTION__ << endl;
-        delete x;
     }
 };
 
@@ -263,7 +236,6 @@ void Mainwindow::openFile(const QString &filename) {
     // d->document->setRenderBackend(Poppler::Document::QPainterBackend);
     d->document->setRenderHint(Poppler::Document::Antialiasing);
     d->document->setRenderHint(Poppler::Document::TextAntialiasing);
-    d->pagewidth = d->page_continer->width();
     // this function will only run once, update later.
     d->words_docu_all = words_forDocument();
     d->page_continer->setDocument(d->document);
@@ -276,152 +248,10 @@ Mainwindow::~Mainwindow() {
     cout << __PRETTY_FUNCTION__ << endl;
 }
 
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-void Mainwindow::load_page(int n) {
-    d->page_cur = n;
-    d->pdfpage = d->document->page(d->page_cur);
-    cout << "load page:" << n << endl;
 
-    d->words_page_all = words_forCurPage();
-    update_filter();
-    // d->words_page_afterFilter = do_filter(d->words_page_all);
-
-    // highlight word.
-    auto myann = new Poppler::HighlightAnnotation;
-    myann->setHighlightType(Poppler::HighlightAnnotation::Highlight);
-
-    // myann->setBoundary(region);
-    //
-    const QList<Poppler::HighlightAnnotation::Quad> quads = {
-        {{{0, 0.1}, {0.2, 0.3}, {0.4, 0.5}, {0.6, 0.7}}, false, false, 0},
-        // {{{0.8, 0.9}, {0.1, 0.2}, {0.3, 0.4}, {0.5, 0.6}}, true, false, 0.4}
-    };
-    myann->setHighlightQuads(quads);
-    Poppler::Annotation::Style styl;
-    styl.setColor(Qt::red);
-    styl.setOpacity(0.5);
-    myann->setStyle(styl);
-
-    // d->pdfpage->addAnnotation(myann);
-    double width = d->pdfpage->pageSizeF().width();
-    double height = d->pdfpage->pageSizeF().height();
-    // d->pdfpage->removeAnnotation();
-    if (0) {
-        for (auto &w : d->words_page_afterFilter) {
-            auto tx = d->pdfpage->textList();
-            QString carried;
-            for (auto i = tx.begin(); i < tx.end(); i++) {
-                auto cur = i->get()->text().simplified();
-                auto rect = i->get()->boundingBox();
-
-                qDebug() << QString("rect: (%1, %2, %3, %4)")
-                                .arg(rect.top() / height)
-                                .arg(rect.left() / width)
-                                .arg(rect.right() / width)
-                                .arg(rect.bottom() / height);
-
-                if (auto res = getWord(carried, cur); res.isEmpty()) {
-                    continue;
-                } else {
-                    cur = res;
-                    if (cur == w) {
-                        auto region = i->get()->boundingBox();
-
-                        auto myann = new Poppler::HighlightAnnotation;
-                        myann->setHighlightType(Poppler::HighlightAnnotation::Underline);
-                        myann->setBoundary(region);
-                        d->pdfpage->addAnnotation(myann);
-                    }
-                }
-            }
-        }
-    }
-    update_image();
-}
-#else
-
-#endif
-
-void Mainwindow::setupBtns() {}
-
-QStringList Mainwindow::check_wordlevel(const QStringList &wordlist) {
-    QStringList res;
-    for (auto word : d->wordItems_in_page.keys()) {
-        auto lv = d->wordstore->getWordLevel(word);
-        d->wordItems_in_page[word]->wordlevel = lv;
-        isValidLevel(lv);
-    }
-
-    return {};
-}
-
-void Mainwindow::update_filter() { check_wordlevel(d->words_page_all); }
-
-QStringList Mainwindow::words_forCurPage() {
-    auto tx = d->pdfpage->textList();
-
-    QStringList suffixes{"s", "es", "ed", "ing"};
-
-    QStringList res;
-    QSet<QString> words_cache;
-    QString carried;
-    d->wordItems_in_page.values();
-    for (auto &i : d->wordItems_in_page.values()) {
-        delete i;
-    }
-    d->wordItems_in_page.clear();
-    for (auto i = tx.begin(); i < tx.end(); i++) {
-        auto cur = (*i)->text();
-        if (cur.size() > 1 and cur[0].isUpper() and cur[1].isUpper()) {
-            cur = cur.simplified();
-        }
-        if (auto res = getWord(carried, cur); res.isEmpty()) {
-            continue;
-        } else {
-            cur = res;
-        }
-
-        bool contains = true;
-        do {
-            if (words_cache.contains(cur)) break;
-            // if (cur[0].isUpper()) {
-            //     for (auto &c : cur) {
-            //         c = c.toLower();
-            //     }
-            //     if (words_cache.contains(cur)) break;
-            // }
-            if (cur[0].isDigit()) break;
-            contains = false;
-        } while (0);
-        auto anno_region = make_pair((*i)->boundingBox(), nullptr);
-        if (contains) {
-            d->wordItems_in_page[cur]->highlight.push_back(anno_region);
-        } else {
-            words_cache.insert(cur);
-            res.push_back(cur);
-
-            WordItem *x = new WordItem;
-            x->original = cur;
-            x->content = cur;
-            x->id = make_pair(d->page_cur, std::distance(i, tx.begin()));
-            x->id_page = d->page_cur;
-            x->id_idx = std::distance(i, tx.begin());
-            // x.boundingbox = (*i)->boundingBox();
-            x->highlight = {anno_region};
-            d->wordItems_in_page[cur] = x;
-        }
-    }
-    return res;
-}
-
-// TODO: refactor words_forDocument/Page => use following two subroutine.
-template <typename c_t>
-bool findword(c_t c, QString &word) {
-    return true;
-}
+void Mainwindow::setupToolbar() {}
 
 QStringList Mainwindow::words_forDocument() {
-    // auto pagex = d->page_cur;
     QStringList suffixes{"s", "es", "ed", "ing"};
     QStringList res;
     QSet<QString> words_cache;
@@ -471,7 +301,9 @@ void Mainwindow::test_scan_annotations() {
         }
     }
 }
-void Mainwindow::load_settings() { d->scale = Settings::instance()->pageScale(); }
+void Mainwindow::load_settings() {
+    // d->scale = Settings::instance()->pageScale();
+}
 
 void Mainwindow::test_load_outline() {
     auto outline = Outline();
@@ -480,28 +312,3 @@ void Mainwindow::test_load_outline() {
     outline.display_outline();
 }
 
-Poppler::HighlightAnnotation *Mainwindow::make_highlight(QRectF region) {
-    auto boundary = d->normalizedTransform.inverted().mapRect(region);
-    QList<Poppler::HighlightAnnotation::Quad> quads;
-    {
-        Poppler::HighlightAnnotation::Quad quad{{}, true, true, 0.1};
-        quad.points[0] = boundary.topLeft();
-        quad.points[1] = boundary.topRight();
-        quad.points[2] = boundary.bottomRight();
-        quad.points[3] = boundary.bottomLeft();
-        quads.push_back(quad);
-    }
-
-    Poppler::Annotation::Style styl;
-    styl.setColor(Qt::red);
-    styl.setOpacity(0.5);
-
-    auto myann = new Poppler::HighlightAnnotation;
-    // myann->setHighlightType(Poppler::HighlightAnnotation::Underline);
-    myann->setHighlightQuads(quads);
-    myann->setBoundary(boundary);
-
-    myann->setStyle(styl);
-    d->pdfpage->addAnnotation(myann);
-    return myann;
-}

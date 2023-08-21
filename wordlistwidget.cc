@@ -20,19 +20,27 @@
 #include <QThread>
 
 void removeSeletedRowsFromView(QAbstractItemView *view) {
+    qDebug() << __PRETTY_FUNCTION__ << ":" << __LINE__;
     auto selections = view->selectionModel()->selectedIndexes();
-    if (selections.isEmpty()) return;
+    if (selections.isEmpty()) {
+        qDebug() << __PRETTY_FUNCTION__ << ":" << __LINE__;
+        return;
+    }
     // sort indexes with  x.row() from big to small.
     std::sort(selections.begin(), selections.end(),
               [](auto &&l, auto &&r) { return l.row() > r.row(); });
     auto model = view->model();
     for (auto idx : selections) {
+        qDebug() << "remove row :" << idx.row();
         model->removeRow(idx.row());
     }
+    view->update();
+    qDebug() << __PRETTY_FUNCTION__ << ":" << __LINE__;
 }
 
 struct PrivateData {
     QListView *wordlistview{nullptr};
+    WordItemMap *data;
     QStringListModel *model{nullptr};
     WordModel *sourceModel{nullptr};
     WordSortFilterProxyModel *proxyModel{nullptr};
@@ -86,6 +94,7 @@ void WordlistWidget::setupModel(WordItemMap *data) {
     if (d->sourceModel == nullptr) {
         return;
     }
+    d->data = data;
     d->sourceModel->setupModelData(data);
 }
 
@@ -116,11 +125,12 @@ void WordlistWidget::onListViewContextMenu(const QPoint &pos) {
     menu->exec(mapToGlobal(pos));
 }
 
-// NOTE: need to do multiple-things
-// edit the page-view highlight
-// edit the item status, remove from list-view.
+//NOTE: if should know the level before update:
+//1. for sql, add/update, should know.
+//2. highlight, doesn't need, highlight use ptr.
 void WordlistWidget::markSelectionWithLevel(wordlevel_t lv) {
     auto sels = d->wordlistview->selectionModel()->selectedIndexes();
+    qDebug() << "sels size:" << sels.size();
     std::sort(sels.begin(), sels.end(),
               [](auto &&l, auto &&r) { return l.row() > r.row(); });
     QList<WordItem *> edits;
@@ -132,11 +142,23 @@ void WordlistWidget::markSelectionWithLevel(wordlevel_t lv) {
         edits.push_back(item);
         words.push_back(word);
         d->wordstore->updateWord(word, item->wordlevel, lv);
+        // qDebug() << QString("update word %1 from level %2 to level %3")
+        //                 .arg(word)
+        //                 .arg(levelString(item->wordlevel))
+        //                 .arg(levelString(lv));
+        item->wordlevel = lv;
+        d->data->value(word)->wordlevel = lv;
     }
-
+    // TODO:  make connections to edit highlight.
     emit markItemsLevel(words, lv);
 
+    // TODO: mark to
+    // 1. knew, hide.
+    // 2. dict, hide or show, checkings. filter should check settings then show/hide.
+    // 3. ignore, hide.
     d->proxyModel->updateFilter();
+
+    d->wordlistview->update();
 }
 
 void WordlistWidget::onPageLoadBefore() { d->sourceModel->reset_data_before(); }

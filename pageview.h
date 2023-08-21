@@ -39,6 +39,10 @@ class PageView : public QWidget {
 
     // highlight
     Poppler::HighlightAnnotation *make_highlight(QRectF region);
+    Poppler::HighlightAnnotation *make_highlight(const QString &word);
+
+    void update_highlight(const QString &word);
+    void update_highlight(QStringList words);
 
     // jump
     void go_next();

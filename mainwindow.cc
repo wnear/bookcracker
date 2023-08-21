@@ -154,6 +154,10 @@ Mainwindow::Mainwindow() {
             &WordlistWidget::onPageLoadBefore);
     connect(d->page_continer->focus(), &PageView::PageLoadDone, d->wordwgt,
             &WordlistWidget::onPageLoadAfter);
+    connect(d->wordwgt, &WordlistWidget::markItemsLevel, this, [this](QStringList words, wordlevel_t lv) {
+        auto pv = d->page_continer->focus();
+        pv->update_highlight(words);
+    });
 }
 
 void Mainwindow::openFile(const QString &filename) {

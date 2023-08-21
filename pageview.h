@@ -30,9 +30,9 @@ class PageView : public QWidget {
     void update_image();
 
     // word.
-    QStringList words_forCurPage();
+    QStringList parsePage();
     void update_filter();
-    QStringList check_wordlevel(const QStringList &wordlist);
+    QStringList check_wordlevel();
 
     // highlight
     Poppler::HighlightAnnotation *make_highlight(QRectF region);

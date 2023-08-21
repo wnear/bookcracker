@@ -38,8 +38,7 @@ class PageView : public QWidget {
     WordItemMap *getWordItems();
 
     // highlight
-    Poppler::HighlightAnnotation *make_highlight(QRectF region);
-    Poppler::HighlightAnnotation *make_highlight(const QString &word);
+    Poppler::HighlightAnnotation *make_highlight(QRectF region, const QColor &color);
 
     void update_highlight(const QString &word);
     void update_highlight(QStringList words);

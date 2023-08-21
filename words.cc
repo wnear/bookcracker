@@ -147,6 +147,6 @@ SqlSave::SqlSave() :Words(){
 void SqlSave::load() {
     qDebug()<<"begin loading";
     SQLManager::instance()->getwords(m_all_list);
-    qDebug()<<"loading done: " << m_all_list.size();
+    qDebug()<<"loading done, sql has collect words: " << m_all_list.size();
 }
 

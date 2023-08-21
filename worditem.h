@@ -56,7 +56,7 @@ struct WordItem {
     bool isIndict{false};
     QString meaning;    // get from dictionary/disk, may need to cache to disk.
     bool isVisible() {  // visible in wordlist and highlight.
-        return wordlevel == LEVEL_UNKOWN;
+        return wordlevel == LEVEL_UNKOWN or wordlevel == WORD_IS_LEARNING;
     }
 };
 

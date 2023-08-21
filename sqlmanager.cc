@@ -97,6 +97,7 @@ void SQLManager::export_level_to_text(wordlevel_t lv, const QString &filename) {
 }
 
 bool SQLManager::addword(const QString &word, wordlevel_t lv) {
+    // qDebug() <<__PRETTY_FUNCTION__<<":"<<__LINE__;
     QSqlQuery q;
     QString cmdstr =
         QString("INSERT INTO word_info (word, proficiency) VALUES (%1, %2)")
@@ -116,6 +117,7 @@ bool SQLManager::addword(const QString &word, wordlevel_t lv) {
 
 // UPDATE COMPANY SET ADDRESS = 'Texas' WHERE ID = 6
 bool SQLManager::updateword(const QString &word, wordlevel_t lv) {
+    // qDebug() <<__PRETTY_FUNCTION__<<":"<<__LINE__;
     QSqlQuery q;
     QString cmdstr =
         QString("update word_info set proficiency = %1 where word=\"%2\"").arg(static_cast<int>(lv)).arg(word);

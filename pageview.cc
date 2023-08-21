@@ -238,6 +238,7 @@ QStringList PageView::parsePage() {
         if (!(*i)->hasSpaceAfter()) {
             // qDebug()<< (*i)->text();
             // auto [cur, bounding] =
+            (*i)->nextWord();
         }
         last = (*i)->boundingBox();
         for (auto [cur, bounding] : display(*i)) {
@@ -328,14 +329,15 @@ void PageView::load_page(int n) {
     parsePage();
     update_filter();
     for (auto i : d->wordItems_in_page.keys()) {
-        make_highlight(i);
+        update_highlight(i);
     }
     // TODO: necessary? maybe for the selection state.
     emit PageLoadDone();
     update_image();
 }
 
-Poppler::HighlightAnnotation *PageView::make_highlight(QRectF region) {
+Poppler::HighlightAnnotation *PageView::make_highlight(QRectF region,
+                                                       const QColor &color) {
     auto boundary = d->normalizedTransform.inverted().mapRect(region);
     QList<Poppler::HighlightAnnotation::Quad> quads;
     {
@@ -348,7 +350,7 @@ Poppler::HighlightAnnotation *PageView::make_highlight(QRectF region) {
     }
 
     Poppler::Annotation::Style styl;
-    styl.setColor(Qt::red);
+    styl.setColor(color);
     styl.setOpacity(0.5);
 
     auto *myann = new Poppler::HighlightAnnotation;
@@ -362,28 +364,21 @@ Poppler::HighlightAnnotation *PageView::make_highlight(QRectF region) {
     return myann;
 }
 
-Poppler::HighlightAnnotation *PageView::make_highlight(const QString &word) {
-    auto &hl = d->wordItems_in_page[word]->highlight;
-    auto is_visible = d->wordItems_in_page[word]->isVisible();
-    for (auto i = hl.begin(); i != hl.end(); i++) {
-        if (is_visible && i->second == nullptr) {
-            i->second = this->make_highlight(i->first);
-        }
-    }
-    return nullptr;
-}
-
 void PageView::update_highlight(const QString &word) {
-    auto &hl = d->wordItems_in_page[word]->highlight;
+    auto *item = d->wordItems_in_page[word];
+    auto color = item->wordlevel == LEVEL_UNKOWN ? Qt::red : Qt::blue;
+    auto &hl = item->highlight;
+    auto visible = item->isVisible();
     for (auto i = hl.begin(); i != hl.end(); i++) {
-        if (i->second) {
+        if (i->second != nullptr) {
             d->pdfpage->removeAnnotation(i->second);
-            qDebug() << "remove anno_region x";
             i->second = nullptr;
         }
+        if(visible)
+            i->second = this->make_highlight(i->first, color);
     }
-    // make_highlight(word);
 }
+
 void PageView::update_highlight(QStringList words) {
     for (auto w : words) {
         update_highlight(w);

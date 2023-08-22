@@ -102,9 +102,7 @@ PageView::PageView(QWidget *parent) : QWidget(parent) {
     m_view->show();
     // NOTE: a little tricky,  wait for gui inited, then autoscale.
     QCoreApplication::processEvents();
-    // m_photoItem->setBoardBackground(m_view->backgroundBrush().color());
-    qDebug() << __LINE__;
-    displayInfo();
+    // displayInfo();
 
     autoscale();
 
@@ -129,12 +127,12 @@ PageView::PageView(QWidget *parent) : QWidget(parent) {
 
         connect(btn_zoom_smaller, &QAbstractButton::clicked, this, [this]() {
             m_item_sizescale -= 0.1;
-            m_item_sizescale = std::max<float>(0.3, m_item_sizescale);
+            m_item_sizescale = std::max(0.3f, m_item_sizescale);
             update_image();
         });
         connect(btn_zoom_bigger, &QAbstractButton::clicked, this, [this]() {
             m_item_sizescale += 0.1;
-            m_item_sizescale = std::min<float>(5, m_item_sizescale);
+            m_item_sizescale = std::min(5.0f, m_item_sizescale);
             update_image();
         });
         connect(btn_test, &QAbstractButton::clicked, this, [this]() {
@@ -197,20 +195,25 @@ QList<std::pair<QString, QRectF>> display(Poppler::TextBox *tb) {
         if (orig[i].isLetter()) {
             if (!last.isLetter()) {
                 word_with_bounding.push_back({{}, {}});
-                // words.push_back({});
             }
             word_with_bounding.back().first.push_back(orig[i]);
             word_with_bounding.back().second |= tb->charBoundingBox(i);
-            // words.back().push_back(i);
         }
         last = orig[i];
     }
-    if (tb->text().back() == '.') {  // end of sentence.
-    }
-    for (auto [k, bd] : word_with_bounding) {
-        // qDebug()<<k;
-    }
     return word_with_bounding;
+}
+
+bool PageView::near(Poppler::TextBox *l, Poppler::TextBox *r) {
+    auto dist_v = l->boundingBox().bottom() - r->boundingBox().bottom();
+
+    if (dist_v == 0) {
+        return true;
+    } else {
+        bool res = dist_v / m_scale < 30;
+        if (res == false) qDebug() << "not near:" << dist_v << "," << m_scale;
+        return dist_v * m_scale < 10;
+    }
 }
 
 QStringList PageView::parsePage() {
@@ -229,59 +232,80 @@ QStringList PageView::parsePage() {
     }
     // d->pdfpage->DontSaveAndRestore
     d->wordItems_in_page.clear();
-    QRectF last = tx[0]->boundingBox();
+
     sentence.push_back(tx[0]->text());
+
+    Poppler::TextBox *tb_last{nullptr}, *tb_cur{nullptr};
+    bool isSentenceStart{true};
     for (auto i = tx.begin(); i < tx.end(); i++) {
         // check last push is line end.
-        sentence.push_back((*i)->text());
-
-        if (!(*i)->hasSpaceAfter()) {
-            // qDebug()<< (*i)->text();
-            // auto [cur, bounding] =
-            (*i)->nextWord();
+        if (tb_last == nullptr) {
+            tb_last = tb_cur = *i;
+        } else {
+            tb_cur = *i;
         }
-        last = (*i)->boundingBox();
-        for (auto [cur, bounding] : display(*i)) {
-            // auto cur = (*i)->text();
-            if (cur.size() <= 1) continue;
-            if (cur.size() > 1 and cur[0].isUpper() and cur[1].isUpper()) {
-                cur = cur.simplified();
-            }
-            // if (auto res = getWord(carried, cur); res.isEmpty()) {
-            //     continue;
-            // } else {
-            //     cur = res;
-            // }
 
-            bool contains = true;
-            do {
-                if (words_cache.contains(cur)) break;
-                // if (cur[0].isUpper()) {
-                //     for (auto &c : cur) {
-                //         c = c.toLower();
-                //     }
-                //     if (words_cache.contains(cur)) break;
-                // }
-                if (cur[0].isDigit()) break;
-                contains = false;
-            } while (0);
-            auto anno_region = make_pair(bounding, nullptr);
-            if (contains) {
-                d->wordItems_in_page[cur]->highlight.push_back(anno_region);
+        if (tb_cur != tb_last) {
+            if (tb_cur->text().back() == '.' or (not near(tb_last, tb_cur))) {
+                sentence.push_back((*i)->text());
+                // qDebug() << QString("sentence:%1").arg(sentence);
+                sentence.clear();
             } else {
-                words_cache.insert(cur);
-                res.push_back(cur);
-
-                WordItem *x = new WordItem;
-                x->original = cur;
-                x->content = cur;
-                x->id = make_pair(d->page_cur, std::distance(i, tx.begin()));
-                x->id_page = d->page_cur;
-                x->id_idx = std::distance(i, tx.begin());
-                // x.boundingbox = (*i)->boundingBox();
-                x->highlight = {anno_region};
-                d->wordItems_in_page[cur] = x;
+                if (sentence.isEmpty()) {
+                    isSentenceStart = true;
+                } else {
+                    isSentenceStart = false;
+                    sentence.push_back(" ");
+                }
+                sentence.push_back((*i)->text());
             }
+        }
+        tb_last = tb_cur;
+
+#if 0
+        //simple logic version of get sentence.
+        auto cur = *i;
+        auto next_tb = cur->nextWord();
+        if (next_tb == nullptr   // for eol and page end, next_tb will be nullptr.
+            or cur->text().back() == '.' ) {
+            qDebug()<<QString("sentence:%1").arg(sentence);
+            sentence.clear();
+        } else {
+            sentence.push_back(" ");
+        }
+#endif
+
+        int el_idx = 0;
+        for (auto [word_cur, bounding] : display(*i)) {
+            el_idx++;
+            QString word_clean{word_cur};
+            if (word_cur.size() <= 1) continue;
+            if (word_cur[0].isDigit()) continue;
+            if (word_cur.size() > 1 and word_cur[0].isUpper() and
+                (not word_cur[1].isUpper())) {
+                word_clean = word_cur.toLower();
+            }
+
+            WordItem *curItem = nullptr;
+            if (words_cache.contains(word_clean)) {
+                curItem = d->wordItems_in_page[word_clean];
+                assert(curItem != nullptr);
+            } else {
+                words_cache.insert(word_clean);
+                curItem = new WordItem;
+                curItem->word = word_clean;
+                d->wordItems_in_page[word_clean] = curItem;
+            }
+            assert(curItem != nullptr);
+            auto anno_region = make_pair(bounding, nullptr);
+            curItem->highlight.push_back(anno_region);
+            sentence_t sen_pos;
+            sen_pos.word = word_cur;
+            sen_pos.page = d->page_cur;
+            sen_pos.location = std::distance(i, tx.begin());
+            sen_pos.wordidx = el_idx;
+            sen_pos.sentence = sentence;
+            curItem->sentenceContext.push_back(sen_pos);
         }
     }
     return res;
@@ -305,6 +329,8 @@ void PageView::load_page(int n) {
             }
         }
     }
+    // TODO: store some info of the d->wordItems_in_page to sql.
+    // like if the word is in learning level, the dict word sentence context.
     emit pageLoadBefore();
     d->wordItems_in_page.clear();
     // d->wordwgt->update();
@@ -374,8 +400,7 @@ void PageView::update_highlight(const QString &word) {
             d->pdfpage->removeAnnotation(i->second);
             i->second = nullptr;
         }
-        if(visible)
-            i->second = this->make_highlight(i->first, color);
+        if (visible) i->second = this->make_highlight(i->first, color);
     }
 }
 

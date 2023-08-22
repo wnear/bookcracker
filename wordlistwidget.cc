@@ -138,7 +138,7 @@ void WordlistWidget::markSelectionWithLevel(wordlevel_t lv) {
     for (auto idx : sels) {
         auto src_idx = d->proxyModel->mapToSource(idx);
         auto *item = static_cast<WordItem *>(src_idx.internalPointer());
-        auto word = item->content;
+        auto word = item->word;
         edits.push_back(item);
         words.push_back(word);
         d->wordstore->updateWord(word, item->wordlevel, lv);

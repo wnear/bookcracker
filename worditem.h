@@ -39,16 +39,22 @@ inline QString levelString(wordlevel_t v) {
 
 bool isValidLevel(wordlevel_t lv);
 
+struct sentence_t {
+    QString word;
+    int page;
+    int location;// index of page->textbox();
+    int wordidx; // textbox may contain multi word, like this_is_good, return three.
+    QString sentence;
+    // sentence_t(){}
+};
+
 struct WordItem {
-    QString content;   // after cleanup.
-    QString original;  // directed frm the text
+    QString word;
 
-    QString context_sentence;
-
+    QList<sentence_t> sentenceContext{};
     QVector<std::pair<QRectF, Poppler::HighlightAnnotation*>> highlight;
-    std::pair<int, int> id;  // page-number.
-    int id_page;
-    int id_idx;
+
+
     bool hasNo;
     wordlevel_t wordlevel{LEVEL_UNKOWN};
     bool isKnown{false};

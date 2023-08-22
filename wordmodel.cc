@@ -36,7 +36,7 @@ QVariant WordModel::data(const QModelIndex &index, int role) const {
             auto data = m_data->value(m_data->keys()[index.row()]);
             switch (index.column()) {
                 case COLUMN_WORD: {
-                    return data->original;
+                    return data->word;
                 }
                 case COLUMN_VISIBLE: {
                     return data->isVisible();
@@ -45,10 +45,10 @@ QVariant WordModel::data(const QModelIndex &index, int role) const {
                     return data->meaning;
                 }
                 case COLUMN_PAGE: {
-                    return data->id_page;
+                    return data->sentenceContext[0].page;
                 }
                 case COLUMN_POS_IN_PAGE: {
-                    return data->id_idx;
+                    return data->sentenceContext[0].location;
                 }
                 default: {
                     return "";

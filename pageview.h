@@ -24,6 +24,7 @@ class PageView : public QWidget {
     void scaleToPageWidth() {}
     void scaleToPageHeight() {}
     void scaleToPageFit() {}
+    bool near(Poppler::TextBox *l, Poppler::TextBox *r );
 
 
     void displayInfo() const;

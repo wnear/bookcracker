@@ -236,6 +236,7 @@ QStringList PageView::parsePage() {
     sentence.push_back(tx[0]->text());
 
     Poppler::TextBox *tb_last{nullptr}, *tb_cur{nullptr};
+    bool isSentenceStart{true};
     for (auto i = tx.begin(); i < tx.end(); i++) {
         // check last push is line end.
         if (tb_last == nullptr) {
@@ -247,10 +248,15 @@ QStringList PageView::parsePage() {
         if (tb_cur != tb_last) {
             if (tb_cur->text().back() == '.' or (not near(tb_last, tb_cur))) {
                 sentence.push_back((*i)->text());
-                qDebug() << QString("sentence:%1").arg(sentence);
+                // qDebug() << QString("sentence:%1").arg(sentence);
                 sentence.clear();
             } else {
-                if (!sentence.isEmpty()) sentence.push_back(" ");
+                if (sentence.isEmpty()) {
+                    isSentenceStart = true;
+                } else {
+                    isSentenceStart = false;
+                    sentence.push_back(" ");
+                }
                 sentence.push_back((*i)->text());
             }
         }
@@ -269,43 +275,37 @@ QStringList PageView::parsePage() {
         }
 #endif
 
-        for (auto [cur, bounding] : display(*i)) {
-            // auto cur = (*i)->text();
-            if (cur.size() <= 1) continue;
-            if (cur.size() > 1 and cur[0].isUpper() and (not cur[1].isUpper())) {
-                cur = cur.simplified();
+        int el_idx = 0;
+        for (auto [word_cur, bounding] : display(*i)) {
+            el_idx++;
+            QString word_clean{word_cur};
+            if (word_cur.size() <= 1) continue;
+            if (word_cur[0].isDigit()) continue;
+            if (word_cur.size() > 1 and word_cur[0].isUpper() and
+                (not word_cur[1].isUpper())) {
+                word_clean = word_cur.toLower();
             }
-            // if (auto res = getWord(carried, cur); res.isEmpty()) {
-            //     continue;
-            // } else {
-            //     cur = res;
-            // }
 
-            bool contains = true;
-            do {
-                if (words_cache.contains(cur)) break;
-                if (cur[0].isDigit()) break;
-                contains = false;
-            } while (0);
-            auto anno_region = make_pair(bounding, nullptr);
-            if (contains) {
-                d->wordItems_in_page[cur]->highlight.push_back(anno_region);
-                d->wordItems_in_page[cur]->sentences.push_back(sentence);
+            WordItem *curItem = nullptr;
+            if (words_cache.contains(word_clean)) {
+                curItem = d->wordItems_in_page[word_clean];
+                assert(curItem != nullptr);
             } else {
-                words_cache.insert(cur);
-                res.push_back(cur);
-
-                WordItem *x = new WordItem;
-                x->original = cur;
-                x->content = cur;
-                x->id = make_pair(d->page_cur, std::distance(i, tx.begin()));
-                x->id_page = d->page_cur;
-                x->id_idx = std::distance(i, tx.begin());
-                // x.boundingbox = (*i)->boundingBox();
-                x->highlight = {anno_region};
-                x->sentences.push_back(sentence);
-                d->wordItems_in_page[cur] = x;
+                words_cache.insert(word_clean);
+                curItem = new WordItem;
+                curItem->word = word_clean;
+                d->wordItems_in_page[word_clean] = curItem;
             }
+            assert(curItem != nullptr);
+            auto anno_region = make_pair(bounding, nullptr);
+            curItem->highlight.push_back(anno_region);
+            sentence_t sen_pos;
+            sen_pos.word = word_cur;
+            sen_pos.page = d->page_cur;
+            sen_pos.location = std::distance(i, tx.begin());
+            sen_pos.wordidx = el_idx;
+            sen_pos.sentence = sentence;
+            curItem->sentenceContext.push_back(sen_pos);
         }
     }
     return res;
@@ -329,6 +329,8 @@ void PageView::load_page(int n) {
             }
         }
     }
+    // TODO: store some info of the d->wordItems_in_page to sql.
+    // like if the word is in learning level, the dict word sentence context.
     emit pageLoadBefore();
     d->wordItems_in_page.clear();
     // d->wordwgt->update();

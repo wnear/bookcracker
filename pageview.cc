@@ -102,9 +102,7 @@ PageView::PageView(QWidget *parent) : QWidget(parent) {
     m_view->show();
     // NOTE: a little tricky,  wait for gui inited, then autoscale.
     QCoreApplication::processEvents();
-    // m_photoItem->setBoardBackground(m_view->backgroundBrush().color());
-    qDebug() << __LINE__;
-    displayInfo();
+    // displayInfo();
 
     autoscale();
 
@@ -129,12 +127,12 @@ PageView::PageView(QWidget *parent) : QWidget(parent) {
 
         connect(btn_zoom_smaller, &QAbstractButton::clicked, this, [this]() {
             m_item_sizescale -= 0.1;
-            m_item_sizescale = std::max<float>(0.3, m_item_sizescale);
+            m_item_sizescale = std::max(0.3f, m_item_sizescale);
             update_image();
         });
         connect(btn_zoom_bigger, &QAbstractButton::clicked, this, [this]() {
             m_item_sizescale += 0.1;
-            m_item_sizescale = std::min<float>(5, m_item_sizescale);
+            m_item_sizescale = std::min(5.0f, m_item_sizescale);
             update_image();
         });
         connect(btn_test, &QAbstractButton::clicked, this, [this]() {
@@ -197,25 +195,17 @@ QList<std::pair<QString, QRectF>> display(Poppler::TextBox *tb) {
         if (orig[i].isLetter()) {
             if (!last.isLetter()) {
                 word_with_bounding.push_back({{}, {}});
-                // words.push_back({});
             }
             word_with_bounding.back().first.push_back(orig[i]);
             word_with_bounding.back().second |= tb->charBoundingBox(i);
-            // words.back().push_back(i);
         }
         last = orig[i];
-    }
-    if (tb->text().back() == '.') {  // end of sentence.
-    }
-    for (auto [k, bd] : word_with_bounding) {
-        // qDebug()<<k;
     }
     return word_with_bounding;
 }
 
 bool PageView::near(Poppler::TextBox *l, Poppler::TextBox *r) {
     auto dist_v = l->boundingBox().bottom() - r->boundingBox().bottom();
-    auto dist_h = l->boundingBox().bottom() - r->boundingBox().top();
 
     if (dist_v == 0) {
         return true;
@@ -294,12 +284,6 @@ QStringList PageView::parsePage() {
             bool contains = true;
             do {
                 if (words_cache.contains(cur)) break;
-                // if (cur[0].isUpper()) {
-                //     for (auto &c : cur) {
-                //         c = c.toLower();
-                //     }
-                //     if (words_cache.contains(cur)) break;
-                // }
                 if (cur[0].isDigit()) break;
                 contains = false;
             } while (0);
